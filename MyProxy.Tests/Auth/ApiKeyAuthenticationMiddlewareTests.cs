@@ -19,8 +19,10 @@ public class ApiKeyAuthenticationMiddlewareTests
         var options = CreateOptions();
         var hasher = new Sha256ApiKeyHasher();
         var client = Client.Create("Flight Ops", hasher.Hash("valid-key"), new[] { "read:flights" });
+        client.AssignRateLimit(RateLimit.Create(requestLimit: 120, window: TimeSpan.FromMinutes(1)));
         await SaveClientAsync(options, client);
         var context = CreateHttpContext("valid-key", "read:flights");
+        var clientContext = new GatewayClientContext();
         var nextCalled = false;
         var middleware = new ApiKeyAuthenticationMiddleware(_ =>
         {
@@ -31,10 +33,11 @@ public class ApiKeyAuthenticationMiddlewareTests
         await middleware.InvokeAsync(
             context,
             new DatabaseClientApiKeyResolver(new TestGatewayDbContextFactory(options), hasher),
-            new GatewayClientContext());
+            clientContext);
 
         Assert.True(nextCalled);
         Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Equal(120, clientContext.Client?.RateLimit?.RequestLimit);
     }
 
     [Fact]

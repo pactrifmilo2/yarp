@@ -26,6 +26,7 @@ public sealed class DatabaseClientApiKeyResolver(
         var client = await dbContext.Clients
             .AsNoTracking()
             .Include(entity => entity.Scopes)
+            .Include(entity => entity.RateLimit)
             .SingleOrDefaultAsync(entity => entity.ApiKeyHash == apiKeyHash, cancellationToken);
 
         if (client is null || !client.IsActive || client.ExpiresAt <= DateTimeOffset.UtcNow)

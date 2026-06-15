@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: phase4
     content: Implement per-client partitioned rate limiting with limits sourced from DB; TDD enforcement and 429 responses.
-    status: pending
+    status: completed
   - id: phase5
     content: Add audit-logging middleware capturing timestamp, client, IP, method, endpoint, status, latency to DB; TDD that each request writes a correct audit entry.
     status: pending
