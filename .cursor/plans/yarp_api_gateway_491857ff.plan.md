@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: phase5
     content: Add audit-logging middleware capturing timestamp, client, IP, method, endpoint, status, latency to DB; TDD that each request writes a correct audit entry.
-    status: pending
+    status: completed
   - id: phase6
     content: Build control-plane REST API for client/scope/rate-limit/route CRUD (TDD the API layer) plus a Vietnamese Blazor Server admin UI for client management, audit log viewer, and overview (UI screens not TDD'd).
     status: pending

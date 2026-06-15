@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using MyProxy.Infrastructure;
+using MyProxy.Infrastructure.Auditing;
 using MyProxy.Infrastructure.Auth;
 using MyProxy.Infrastructure.RateLimiting;
 
@@ -15,6 +16,7 @@ var app = builder.Build();
 // Register the reverse proxy routes
 app.MapReverseProxy(proxyPipeline =>
 {
+    proxyPipeline.UseMiddleware<AuditLoggingMiddleware>();
     proxyPipeline.UseMiddleware<ApiKeyAuthenticationMiddleware>();
     proxyPipeline.UseMiddleware<ClientRateLimitingMiddleware>();
 });
