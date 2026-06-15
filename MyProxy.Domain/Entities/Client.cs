@@ -51,6 +51,11 @@ public sealed class Client
         RateLimit = rateLimit;
     }
 
+    public void SetExpiration(DateTimeOffset? expiresAt)
+    {
+        ExpiresAt = expiresAt;
+    }
+
     private static string RequireValue(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))

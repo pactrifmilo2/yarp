@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: phase3
     content: Add API-key authentication middleware (resolve calling client) and scope-based authorization matched to route requirements; TDD valid/invalid/expired keys and scope allow/deny.
-    status: pending
+    status: completed
   - id: phase4
     content: Implement per-client partitioned rate limiting with limits sourced from DB; TDD enforcement and 429 responses.
     status: pending

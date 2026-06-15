@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MyProxy.Infrastructure.Auth;
 using MyProxy.Infrastructure.Persistence;
 using MyProxy.Infrastructure.Proxy;
 using Yarp.ReverseProxy.Configuration;
@@ -27,6 +28,9 @@ public static class DependencyInjection
         services.AddSingleton<DatabaseProxyConfigProvider>();
         services.AddSingleton<IProxyConfigProvider>(provider =>
             provider.GetRequiredService<DatabaseProxyConfigProvider>());
+        services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
+        services.AddScoped<IClientApiKeyResolver, DatabaseClientApiKeyResolver>();
+        services.AddScoped<GatewayClientContext>();
 
         return services;
     }
