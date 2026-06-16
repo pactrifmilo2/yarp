@@ -1,11 +1,13 @@
 using MyProxy.Admin.Components;
 using MyProxy.Admin.ControlPlane;
 using MyProxy.Admin.Docs;
+using MyProxy.Admin.OpenApi;
 using MyProxy.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
+builder.Services.AddGatewayOpenApi();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -26,6 +28,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapGatewayOpenApi();
 app.MapDocsEndpoints();
 app.MapControlPlaneApi();
 app.MapRazorComponents<App>()
