@@ -1,0 +1,85 @@
+@page "/audit-logs"
+@rendermode InteractiveServer
+@inject GatewayDbContext DbContext
+
+<PageTitle>Nhật ký truy cập</PageTitle>
+
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Giám sát</p>
+        <h1>Nhật ký truy cập</h1>
+        <p>Theo dõi client, endpoint, mã phản hồi và độ trễ của các yêu cầu đi qua gateway.</p>
+    </div>
+    <div class="toolbar">
+        <label>
+            Số dòng
+            <InputNumber @bind-Value="_take" />
+        </label>
+        <button class="primary-button" type="button" @onclick="LoadAuditEntriesAsync">Tải lại</button>
+    </div>
+</section>
+
+<section class="panel">
+    @if (_auditEntries.Count == 0)
+    {
+        <p>Chưa có nhật ký truy cập.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Thời gian</th>
+                        <th>Client</th>
+                        <th>IP</th>
+                        <th>Phương thức</th>
+                        <th>Endpoint</th>
+                        <th>Trạng thái</th>
+                        <th>Độ trễ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in _auditEntries)
+                    {
+                        <tr>
+                            <td>@entry.Timestamp.ToLocalTime().ToString("HH:mm:ss dd/MM/yyyy")</td>
+                            <td>@(entry.Client?.Name ?? "Không xác định")</td>
+                            <td>@entry.IpAddress</td>
+                            <td>@entry.Method</td>
+                            <td>@entry.Path</td>
+                            <td>
+                                <span class="status @(entry.StatusCode < 400 ? "status-ok" : "status-error")">
+                                    @entry.StatusCode
+                                </span>
+                            </td>
+                            <td>@entry.Latency.TotalMilliseconds.ToString("0.##") ms</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private int _take = 100;
+    private List<AuditEntry> _auditEntries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuditEntriesAsync();
+    }
+
+    private async Task LoadAuditEntriesAsync()
+    {
+        var take = Math.Clamp(_take, 1, 500);
+        _take = take;
+        _auditEntries = await DbContext.AuditEntries
+            .AsNoTracking()
+            .Include(entry => entry.Client)
+            .OrderByDescending(entry => entry.Timestamp)
+            .Take(take)
+            .ToListAsync();
+    }
+}

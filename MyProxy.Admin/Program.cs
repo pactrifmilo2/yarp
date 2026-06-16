@@ -1,4 +1,5 @@
 using MyProxy.Admin.Components;
+using MyProxy.Admin.ControlPlane;
 using MyProxy.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +25,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapControlPlaneApi();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

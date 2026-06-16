@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
@@ -23,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MyProxy.Domain\MyProxy.Domain.csproj" />
     <ProjectReference Include="..\MyProxy.Infrastructure\MyProxy.Infrastructure.csproj" />
+    <ProjectReference Include="..\MyProxy.Admin\MyProxy.Admin.csproj" />
   </ItemGroup>
 
 </Project>

@@ -59,6 +59,29 @@ public sealed class RouteDefinition
         return new RouteDefinition(routeId, clusterId, path, destinationAddress, requiredScopes);
     }
 
+    public void Update(
+        string routeId,
+        string clusterId,
+        string path,
+        string destinationAddress,
+        bool isEnabled,
+        IEnumerable<string> requiredScopes)
+    {
+        ArgumentNullException.ThrowIfNull(requiredScopes);
+
+        RouteId = RequireValue(routeId, nameof(routeId));
+        ClusterId = RequireValue(clusterId, nameof(clusterId));
+        Path = RequireValue(path, nameof(path));
+        DestinationAddress = RequireAbsoluteUri(destinationAddress);
+        IsEnabled = isEnabled;
+
+        _requiredScopes.Clear();
+        foreach (var scope in requiredScopes)
+        {
+            _requiredScopes.Add(Scope.Create(scope));
+        }
+    }
+
     private static string RequireValue(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))

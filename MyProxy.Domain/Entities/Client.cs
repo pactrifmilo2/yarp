@@ -45,6 +45,24 @@ public sealed class Client
         return new Client(name, apiKeyHash, scopes);
     }
 
+    public void Update(string name, bool isActive, DateTimeOffset? expiresAt)
+    {
+        Name = RequireValue(name, nameof(name));
+        IsActive = isActive;
+        ExpiresAt = expiresAt;
+    }
+
+    public void ReplaceScopes(IEnumerable<string> scopes)
+    {
+        ArgumentNullException.ThrowIfNull(scopes);
+
+        _scopes.Clear();
+        foreach (var scope in scopes)
+        {
+            _scopes.Add(Scope.Create(scope));
+        }
+    }
+
     public void AssignRateLimit(RateLimit rateLimit)
     {
         ArgumentNullException.ThrowIfNull(rateLimit);

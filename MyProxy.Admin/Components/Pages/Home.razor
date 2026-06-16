@@ -1,7 +1,84 @@
 ﻿@page "/"
+@inject GatewayDbContext DbContext
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Tổng quan</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Cổng API nội bộ</p>
+        <h1>Tổng quan hệ thống</h1>
+        <p>Quản lý client, khóa API, hạn mức và theo dõi lưu lượng qua YARP Gateway.</p>
+    </div>
+</section>
 
-Welcome to your new app.
+<section class="metric-grid">
+    <article class="metric-card">
+        <span>Client đang hoạt động</span>
+        <strong>@_activeClients</strong>
+    </article>
+    <article class="metric-card">
+        <span>Tuyến proxy</span>
+        <strong>@_enabledRoutes</strong>
+    </article>
+    <article class="metric-card">
+        <span>Yêu cầu đã ghi nhận</span>
+        <strong>@_auditEntries</strong>
+    </article>
+    <article class="metric-card">
+        <span>Lỗi gần đây</span>
+        <strong>@_recentErrors</strong>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <h2>Tài liệu tích hợp</h2>
+        <p>Chia sẻ các liên kết này cho đội nội bộ khi cần kết nối qua gateway.</p>
+        <div class="link-list">
+            <a href="/swagger" target="_blank">Swagger/OpenAPI</a>
+            <a href="/docs/postman" target="_blank">Postman collection</a>
+            <a href="/clients">Quản lý khóa API</a>
+        </div>
+    </article>
+
+    <article class="panel">
+        <h2>Nhật ký mới nhất</h2>
+        @if (_recentAuditEntries.Count == 0)
+        {
+            <p>Chưa có yêu cầu nào được ghi nhận.</p>
+        }
+        else
+        {
+            <ul class="activity-list">
+                @foreach (var entry in _recentAuditEntries)
+                {
+                    <li>
+                        <strong>@entry.Method @entry.Path</strong>
+                        <span>@entry.StatusCode - @entry.Timestamp.ToLocalTime().ToString("HH:mm:ss dd/MM/yyyy")</span>
+                    </li>
+                }
+            </ul>
+        }
+    </article>
+</section>
+
+@code {
+    private int _activeClients;
+    private int _enabledRoutes;
+    private int _auditEntries;
+    private int _recentErrors;
+    private List<AuditEntry> _recentAuditEntries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _activeClients = await DbContext.Clients.CountAsync(client => client.IsActive);
+        _enabledRoutes = await DbContext.Routes.CountAsync(route => route.IsEnabled);
+        _auditEntries = await DbContext.AuditEntries.CountAsync();
+        _recentErrors = await DbContext.AuditEntries.CountAsync(entry => entry.StatusCode >= 400);
+        _recentAuditEntries = await DbContext.AuditEntries
+            .AsNoTracking()
+            .OrderByDescending(entry => entry.Timestamp)
+            .Take(5)
+            .ToListAsync();
+    }
+}

@@ -1,0 +1,187 @@
+@page "/clients"
+@rendermode InteractiveServer
+@inject GatewayDbContext DbContext
+@inject IApiKeyHasher ApiKeyHasher
+
+<PageTitle>Khách hàng API</PageTitle>
+
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Control plane</p>
+        <h1>Khách hàng API</h1>
+        <p>Tạo khóa API, gán scope và cấu hình hạn mức theo từng client nội bộ.</p>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="notice">@_message</div>
+}
+
+<section class="panel">
+    <h2>Thêm client mới</h2>
+    <EditForm Model="_newClient" OnValidSubmit="CreateClientAsync" FormName="create-client">
+        <DataAnnotationsValidator />
+        <div class="form-grid">
+            <label>
+                Tên client
+                <InputText @bind-Value="_newClient.Name" />
+            </label>
+            <label>
+                API key ban đầu
+                <InputText @bind-Value="_newClient.ApiKey" />
+            </label>
+            <label>
+                Scope (phân tách bằng dấu phẩy)
+                <InputText @bind-Value="_newClient.ScopesCsv" />
+            </label>
+            <label>
+                Số request
+                <InputNumber @bind-Value="_newClient.RequestLimit" />
+            </label>
+            <label>
+                Cửa sổ hạn mức (giây)
+                <InputNumber @bind-Value="_newClient.WindowSeconds" />
+            </label>
+        </div>
+        <button class="primary-button" type="submit">Tạo client</button>
+    </EditForm>
+</section>
+
+<section class="panel">
+    <h2>Danh sách client</h2>
+    @if (_clients.Count == 0)
+    {
+        <p>Chưa có client nào.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tên</th>
+                        <th>Trạng thái</th>
+                        <th>Scope</th>
+                        <th>Hạn mức</th>
+                        <th>Ngày tạo</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var client in _clients)
+                    {
+                        <tr>
+                            <td>@client.Name</td>
+                            <td>
+                                <span class="status @(client.IsActive ? "status-ok" : "status-muted")">
+                                    @(client.IsActive ? "Đang hoạt động" : "Đã tắt")
+                                </span>
+                            </td>
+                            <td>@string.Join(", ", client.Scopes.Select(scope => scope.Name).Order())</td>
+                            <td>@FormatRateLimit(client.RateLimit)</td>
+                            <td>@client.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                            <td class="actions">
+                                <button type="button" @onclick="() => ToggleClientAsync(client)">
+                                    @(client.IsActive ? "Tắt" : "Bật")
+                                </button>
+                                <button type="button" class="danger" @onclick="() => DeleteClientAsync(client)">
+                                    Xóa
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly NewClientForm _newClient = new()
+    {
+        RequestLimit = 100,
+        WindowSeconds = 60,
+    };
+
+    private List<Client> _clients = [];
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClientsAsync();
+    }
+
+    private async Task CreateClientAsync()
+    {
+        try
+        {
+            var scopes = ParseScopes(_newClient.ScopesCsv);
+            var client = Client.Create(_newClient.Name, ApiKeyHasher.Hash(_newClient.ApiKey), scopes);
+            client.AssignRateLimit(RateLimit.Create(_newClient.RequestLimit, TimeSpan.FromSeconds(_newClient.WindowSeconds)));
+
+            DbContext.Clients.Add(client);
+            await DbContext.SaveChangesAsync();
+
+            _message = $"Đã tạo client {_newClient.Name}.";
+            _newClient.Name = string.Empty;
+            _newClient.ApiKey = string.Empty;
+            _newClient.ScopesCsv = string.Empty;
+            await LoadClientsAsync();
+        }
+        catch (ArgumentException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+
+    private async Task ToggleClientAsync(Client client)
+    {
+        client.Update(client.Name, !client.IsActive, client.ExpiresAt);
+        await DbContext.SaveChangesAsync();
+        await LoadClientsAsync();
+    }
+
+    private async Task DeleteClientAsync(Client client)
+    {
+        DbContext.Clients.Remove(client);
+        await DbContext.SaveChangesAsync();
+        _message = $"Đã xóa client {client.Name}.";
+        await LoadClientsAsync();
+    }
+
+    private async Task LoadClientsAsync()
+    {
+        _clients = await DbContext.Clients
+            .Include(client => client.Scopes)
+            .Include(client => client.RateLimit)
+            .OrderBy(client => client.Name)
+            .ToListAsync();
+    }
+
+    private static string[] ParseScopes(string scopesCsv)
+    {
+        return scopesCsv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static string FormatRateLimit(RateLimit? rateLimit)
+    {
+        return rateLimit is null
+            ? "Chưa cấu hình"
+            : $"{rateLimit.RequestLimit} request / {rateLimit.Window.TotalSeconds:0} giây";
+    }
+
+    private sealed class NewClientForm
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string ApiKey { get; set; } = string.Empty;
+
+        public string ScopesCsv { get; set; } = string.Empty;
+
+        public int RequestLimit { get; set; }
+
+        public int WindowSeconds { get; set; }
+    }
+}

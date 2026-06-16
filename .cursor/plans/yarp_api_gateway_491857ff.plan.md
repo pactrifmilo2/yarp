@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: phase6
     content: Build control-plane REST API for client/scope/rate-limit/route CRUD (TDD the API layer) plus a Vietnamese Blazor Server admin UI for client management, audit log viewer, and overview (UI screens not TDD'd).
-    status: pending
+    status: completed
   - id: phase7
     content: Wire OpenTelemetry metrics, expose Prometheus endpoint, and provision a Grafana monitoring dashboard (or custom Vietnamese dashboard from DB aggregates) matching mockup screen 3.
     status: pending
