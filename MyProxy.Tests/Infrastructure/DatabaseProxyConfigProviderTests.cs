@@ -29,6 +29,8 @@ public class DatabaseProxyConfigProviderTests
         Assert.Equal("flights-cluster", route.ClusterId);
         Assert.Equal("/api/flights/{**catch-all}", route.Match.Path);
         Assert.Equal("read:flights", route.Metadata?["RequiredScopes"]);
+        Assert.NotNull(route.Transforms);
+        Assert.Equal("/api/flights", route.Transforms![0]["PathRemovePrefix"]);
 
         var cluster = Assert.Single(config.Clusters);
         Assert.Equal("flights-cluster", cluster.ClusterId);
@@ -68,6 +70,21 @@ public class DatabaseProxyConfigProviderTests
         Assert.Equal(
             new[] { "https://flights.internal/", "https://notams.internal/" },
             cluster.Destinations.Values.Select(destination => destination.Address));
+    }
+
+    [Fact]
+    public void MapTransforms_adds_prefix_removal_for_catch_all_routes()
+    {
+        var transforms = RoutePathTransforms.MapTransforms("/flights/{**catch-all}");
+
+        Assert.NotNull(transforms);
+        Assert.Equal("/flights", transforms![0]["PathRemovePrefix"]);
+    }
+
+    [Fact]
+    public void MapTransforms_skips_root_catch_all_routes()
+    {
+        Assert.Null(RoutePathTransforms.MapTransforms("/{**catch-all}"));
     }
 
     [Fact]

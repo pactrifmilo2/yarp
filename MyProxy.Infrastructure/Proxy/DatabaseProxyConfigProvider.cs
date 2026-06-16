@@ -61,6 +61,7 @@ public sealed class DatabaseProxyConfigProvider : IProxyConfigProvider
                     Path = route.Path,
                 },
                 Metadata = MapRouteMetadata(route),
+                Transforms = RoutePathTransforms.MapTransforms(route.Path),
             })
             .ToArray();
     }

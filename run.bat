@@ -17,11 +17,26 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo Restoring and building solution once...
+dotnet restore "%~dp0YarpGateway.sln"
+if errorlevel 1 (
+    echo Restore failed. Fix restore errors and run again.
+    pause
+    exit /b 1
+)
+
+dotnet build "%~dp0YarpGateway.sln" --no-restore
+if errorlevel 1 (
+    echo Build failed. Fix build errors and run again.
+    pause
+    exit /b 1
+)
+
 echo Starting MyProxy Admin  (http://localhost:5106) ...
-start "MyProxy Admin" cmd /k dotnet run --project "%~dp0MyProxy.Admin\MyProxy.Admin.csproj" --launch-profile http
+start "MyProxy Admin" cmd /k dotnet run --no-build --project "%~dp0MyProxy.Admin\MyProxy.Admin.csproj" --launch-profile http
 
 echo Starting MyProxy Gateway (http://localhost:5176) ...
-start "MyProxy Gateway" cmd /k dotnet run --project "%~dp0MyProxy\MyProxy.csproj" --launch-profile http
+start "MyProxy Gateway" cmd /k dotnet run --no-build --project "%~dp0MyProxy\MyProxy.csproj" --launch-profile http
 
 echo.
 echo Admin:   http://localhost:5106

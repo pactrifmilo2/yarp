@@ -1,0 +1,635 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "MyProxy YARP Gateway",
+    "description": "Control-plane API and gateway proxy requests for the MyProxy on-prem API gateway.\n\n## Setup\n1. Import this collection into Postman.\n2. Review collection variables (`adminBaseUrl`, `gatewayBaseUrl`, `apiKey`).\n3. Run **Control Plane → Clients → Create client** first if you need a fresh API key.\n4. Run **Control Plane → Routes → List routes** to confirm proxy routes exist.\n5. Use **Gateway → Proxy** requests to test traffic through YARP.\n\n## Ports (default)\n- Admin / control API: `http://localhost:5106`\n- Gateway proxy: `http://localhost:5176`\n\n## Auth\nGateway requests require header `X-API-Key`. Routes may also require scopes such as `read:flights`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "adminBaseUrl",
+      "value": "http://localhost:5106"
+    },
+    {
+      "key": "gatewayBaseUrl",
+      "value": "http://localhost:5176"
+    },
+    {
+      "key": "apiKey",
+      "value": "test-secret-key"
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "routeDbId",
+      "value": ""
+    },
+    {
+      "key": "scopeId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Gateway (Proxy)",
+      "description": "Requests forwarded through the YARP gateway. Requires a valid API key and matching route/scopes.",
+      "item": [
+        {
+          "name": "GET /get (httpbin via catch-all route)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/get",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "get"
+              ]
+            },
+            "description": "Calls httpbin `/get` through a catch-all route (`/{**catch-all}` → https://httpbin.org/). Expect **200** with JSON body."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /get — missing API key (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/get",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "get"
+              ]
+            },
+            "description": "Expect **401 Unauthorized** when `X-API-Key` is omitted."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /get — invalid API key (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "invalid-key",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/get",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "get"
+              ]
+            },
+            "description": "Expect **401 Unauthorized** for an unknown API key."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /flights/get (prefix route — may 404 upstream)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/flights/get",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "flights",
+                "get"
+              ]
+            },
+            "description": "Example for a `/flights/{**catch-all}` route. Without path transforms, upstream receives `/flights/get` which may **404** on httpbin. Use `/get` with a catch-all route instead."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Control Plane — Clients",
+      "item": [
+        {
+          "name": "List clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get client by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients/{{clientId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients",
+                "{{clientId}}"
+              ]
+            },
+            "description": "Set `clientId` collection variable first (run **Create client** or copy from **List clients**)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('clientId', body.id);",
+                  "    if (body.scopes && body.scopes.length) {",
+                  "        console.log('Client scopes:', body.scopes.join(', '));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Client\",\n  \"apiKey\": \"postman-test-key\",\n  \"scopes\": [\"read:flights\", \"write:flights\"],\n  \"expiresAt\": null,\n  \"rateLimit\": {\n    \"requestLimit\": 100,\n    \"windowSeconds\": 60\n  }\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients"
+              ]
+            },
+            "description": "Creates a client and saves `clientId` to collection variables. Update `apiKey` variable to `postman-test-key` to use this client on gateway requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Update client",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Client (updated)\",\n  \"isActive\": true,\n  \"scopes\": [\"read:flights\"],\n  \"expiresAt\": null,\n  \"rateLimit\": {\n    \"requestLimit\": 50,\n    \"windowSeconds\": 60\n  }\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients/{{clientId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete client",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients/{{clientId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Control Plane — Rate limits",
+      "item": [
+        {
+          "name": "Set client rate limit",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestLimit\": 2,\n  \"windowSeconds\": 60\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients/{{clientId}}/rate-limit",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients",
+                "{{clientId}}",
+                "rate-limit"
+              ]
+            },
+            "description": "Sets a strict limit for testing **429** responses on the gateway. Send 3+ proxy requests within the window."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove client rate limit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients/{{clientId}}/rate-limit",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients",
+                "{{clientId}}",
+                "rate-limit"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Control Plane — Routes",
+      "item": [
+        {
+          "name": "List routes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const routes = pm.response.json();",
+                  "    if (Array.isArray(routes) && routes.length > 0) {",
+                  "        pm.collectionVariables.set('routeDbId', routes[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/routes",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "routes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get route by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/routes/{{routeDbId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "routes",
+                "{{routeDbId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create route (httpbin catch-all)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('routeDbId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeId\": \"postman-httpbin-route\",\n  \"clusterId\": \"postman-httpbin-cluster\",\n  \"path\": \"/{**catch-all}\",\n  \"destinationAddress\": \"https://httpbin.org/\",\n  \"requiredScopes\": [\"read:flights\"],\n  \"isEnabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/routes",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "routes"
+              ]
+            },
+            "description": "Use a unique `routeId` if this fails with duplicate key. Triggers YARP config reload."
+          },
+          "response": []
+        },
+        {
+          "name": "Update route",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeId\": \"postman-httpbin-route\",\n  \"clusterId\": \"postman-httpbin-cluster\",\n  \"path\": \"/{**catch-all}\",\n  \"destinationAddress\": \"https://httpbin.org/\",\n  \"requiredScopes\": [\"read:flights\"],\n  \"isEnabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/routes/{{routeDbId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "routes",
+                "{{routeDbId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete route",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/routes/{{routeDbId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "routes",
+                "{{routeDbId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Control Plane — Scopes",
+      "item": [
+        {
+          "name": "List scopes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/scopes",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "scopes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create scope",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('scopeId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"read:weather\"\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/scopes",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "scopes"
+              ]
+            },
+            "description": "Standalone scope records. Client/route scopes are usually managed via client or route endpoints."
+          },
+          "response": []
+        },
+        {
+          "name": "Update scope",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"read:weather\"\n}"
+            },
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/scopes/{{scopeId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "scopes",
+                "{{scopeId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete scope",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/scopes/{{scopeId}}",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "scopes",
+                "{{scopeId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Control Plane — Audit",
+      "item": [
+        {
+          "name": "List audit entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/audit-entries?take=50",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "audit-entries"
+              ],
+              "query": [
+                {
+                  "key": "take",
+                  "value": "50",
+                  "description": "1–500, default 100"
+                }
+              ]
+            },
+            "description": "Returns newest gateway requests: client, IP, method, path, status, latency."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
