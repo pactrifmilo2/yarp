@@ -2,11 +2,14 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using MyProxy.Domain.Entities;
 using MyProxy.Infrastructure.Auth;
+using MyProxy.Infrastructure.Metrics;
 using MyProxy.Infrastructure.Persistence;
 
 namespace MyProxy.Infrastructure.Auditing;
 
-public sealed class AuditLoggingMiddleware(RequestDelegate next)
+public sealed class AuditLoggingMiddleware(
+    RequestDelegate next,
+    IGatewayMetrics gatewayMetrics)
 {
     public async Task InvokeAsync(
         HttpContext httpContext,
@@ -18,12 +21,21 @@ public sealed class AuditLoggingMiddleware(RequestDelegate next)
         await next(httpContext);
 
         stopwatch.Stop();
+        var endpoint = GetEndpoint(httpContext.Request);
+        var clientName = clientContext.Client?.Name ?? "anonymous";
+
+        gatewayMetrics.RecordRequest(
+            clientName,
+            httpContext.Request.Method,
+            endpoint,
+            httpContext.Response.StatusCode,
+            stopwatch.Elapsed);
 
         var auditEntry = AuditEntry.Create(
             clientContext.Client?.Id,
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             httpContext.Request.Method,
-            GetEndpoint(httpContext.Request),
+            endpoint,
             httpContext.Response.StatusCode,
             stopwatch.Elapsed);
 

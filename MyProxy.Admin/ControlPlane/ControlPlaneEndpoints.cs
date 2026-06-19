@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MyProxy.Domain.Entities;
 using MyProxy.Infrastructure.Auth;
+using MyProxy.Infrastructure.Monitoring;
 using MyProxy.Infrastructure.Persistence;
 using MyProxy.Infrastructure.Proxy;
 
@@ -22,6 +23,7 @@ public static class ControlPlaneEndpoints
         MapScopeEndpoints(group);
         MapRouteEndpoints(group);
         MapAuditEndpoints(group);
+        MapMonitoringEndpoints(group);
 
         return endpoints;
     }
@@ -440,6 +442,18 @@ public static class ControlPlaneEndpoints
                 .ToListAsync(cancellationToken);
 
             return TypedResults.Ok(auditEntries);
+        });
+    }
+
+    private static void MapMonitoringEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/monitoring/summary", async (
+            [FromServices] MonitoringSummaryQuery query,
+            [FromQuery] int? windowMinutes,
+            CancellationToken cancellationToken) =>
+        {
+            var summary = await query.GetSummaryAsync(windowMinutes, cancellationToken);
+            return TypedResults.Ok(summary);
         });
     }
 

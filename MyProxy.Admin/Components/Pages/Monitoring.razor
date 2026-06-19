@@ -1,0 +1,244 @@
+@page "/monitoring"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject MonitoringSummaryQuery SummaryQuery
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Giám sát lưu lượng</PageTitle>
+
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Giám sát</p>
+        <h1>Giám sát lưu lượng</h1>
+        <p>Theo dõi tổng yêu cầu, tỷ lệ lỗi, độ trễ và các client gửi nhiều lưu lượng qua gateway.</p>
+    </div>
+    <div class="toolbar">
+        <label>
+            Khoảng thời gian
+            <InputSelect @bind-Value="_windowMinutes">
+                <option value="15">15 phút</option>
+                <option value="60">60 phút</option>
+                <option value="240">240 phút</option>
+            </InputSelect>
+        </label>
+        <button class="primary-button" type="button" @onclick="LoadSummaryAsync">Tải lại</button>
+    </div>
+</section>
+
+@if (_summary is null)
+{
+    <section class="panel loading-panel">
+        <div class="loading-orb" aria-hidden="true"></div>
+        <div>
+            <h2>Đang tải dữ liệu giám sát</h2>
+            <p>Hệ thống đang tổng hợp lưu lượng, lỗi và độ trễ mới nhất.</p>
+        </div>
+    </section>
+}
+else
+{
+    <section class="metric-grid">
+        <article class="metric-card metric-card-accent">
+            <span class="metric-label">Tổng yêu cầu</span>
+            <strong>@_summary.TotalRequests</strong>
+            <small>Trong @_summary.WindowMinutes phút gần nhất</small>
+        </article>
+        <article class="metric-card">
+            <span class="metric-label">Tỷ lệ lỗi</span>
+            <strong>@FormatPercent(_summary.ErrorRatePercent)</strong>
+            <small>@GetErrorRateMessage(_summary.ErrorRatePercent)</small>
+        </article>
+        <article class="metric-card">
+            <span class="metric-label">Độ trễ trung bình</span>
+            <strong>@FormatLatency(_summary.AverageLatencyMs)</strong>
+            <small>Thời gian phản hồi trung bình</small>
+        </article>
+        <article class="metric-card">
+            <span class="metric-label">P95 độ trễ</span>
+            <strong>@FormatLatency(_summary.P95LatencyMs)</strong>
+            <small>95% request nhanh hơn mốc này</small>
+        </article>
+    </section>
+
+    <section class="panel monitoring-chart">
+        <div class="panel-title-row">
+            <div>
+                <h2>Lưu lượng theo phút</h2>
+                <p>@_summary.WindowMinutes phút gần nhất</p>
+            </div>
+            <span class="status status-muted">@_summary.TotalRequests yêu cầu</span>
+        </div>
+
+        @if (_summary.RequestsPerMinute.All(point => point.Count == 0))
+        {
+            <div class="empty-state">
+                <strong>Chưa có yêu cầu nào</strong>
+                <p>Biểu đồ sẽ hiển thị khi gateway nhận lưu lượng trong khoảng thời gian này.</p>
+            </div>
+        }
+        else
+        {
+            <div class="chart-frame">
+                <canvas @ref="_trafficChartCanvas" aria-label="Biểu đồ lưu lượng theo phút" role="img"></canvas>
+            </div>
+        }
+    </section>
+
+    <section class="panel-grid">
+        <article class="panel">
+            <h2>Client gửi nhiều yêu cầu</h2>
+            @if (_summary.TopClients.Count == 0)
+            {
+                <p>Chưa có dữ liệu client trong khoảng thời gian này.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Số yêu cầu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var client in _summary.TopClients)
+                            {
+                                <tr>
+                                    <td>@client.ClientName</td>
+                                    <td>@client.RequestCount</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </article>
+
+        <article class="panel">
+            <h2>Mã trạng thái</h2>
+            @if (_summary.StatusCodeBreakdown.Count == 0)
+            {
+                <p>Chưa có mã trạng thái nào được ghi nhận.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mã</th>
+                                <th>Số lượng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var status in _summary.StatusCodeBreakdown)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="status @(status.StatusCode < 400 ? "status-ok" : "status-error")">
+                                            @status.StatusCode
+                                        </span>
+                                    </td>
+                                    <td>@status.Count</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </article>
+    </section>
+
+    <section class="panel monitoring-note">
+        <h2>Prometheus</h2>
+        <p>Gateway cũng xuất metric dạng Prometheus tại <a href="http://localhost:5176/metrics" target="_blank">http://localhost:5176/metrics</a> để đội vận hành có thể scrape bằng hạ tầng riêng.</p>
+    </section>
+}
+
+@code {
+    private int _windowMinutes = 60;
+    private MonitoringSummary? _summary;
+    private ElementReference _trafficChartCanvas;
+    private bool _chartRendered;
+    private bool _renderChartAfterRender;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSummaryAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || _renderChartAfterRender)
+        {
+            _renderChartAfterRender = false;
+            await RenderTrafficChartAsync();
+        }
+    }
+
+    private async Task LoadSummaryAsync()
+    {
+        _summary = await SummaryQuery.GetSummaryAsync(_windowMinutes);
+        _renderChartAfterRender = true;
+    }
+
+    private async Task RenderTrafficChartAsync()
+    {
+        if (_summary is null || _summary.RequestsPerMinute.All(point => point.Count == 0))
+        {
+            if (_chartRendered)
+            {
+                await JsRuntime.InvokeVoidAsync("myProxyMonitoring.destroyTrafficChart");
+                _chartRendered = false;
+            }
+
+            return;
+        }
+
+        var chartData = new
+        {
+            labels = _summary.RequestsPerMinute
+                .Select(point => point.Timestamp.ToLocalTime().ToString("HH:mm"))
+                .ToArray(),
+            values = _summary.RequestsPerMinute
+                .Select(point => point.Count)
+                .ToArray()
+        };
+
+        await JsRuntime.InvokeVoidAsync("myProxyMonitoring.renderTrafficChart", _trafficChartCanvas, chartData);
+        _chartRendered = true;
+    }
+
+    private static string FormatLatency(double value)
+    {
+        return $"{value:0.#} ms";
+    }
+
+    private static string FormatPercent(double value)
+    {
+        return $"{value:0.#}%";
+    }
+
+    private static string GetErrorRateMessage(double value)
+    {
+        return value == 0 ? "Không ghi nhận lỗi" : "Cần theo dõi xu hướng lỗi";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_chartRendered)
+        {
+            return;
+        }
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("myProxyMonitoring.destroyTrafficChart");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit may already be gone while the page is being disposed.
+        }
+    }
+}

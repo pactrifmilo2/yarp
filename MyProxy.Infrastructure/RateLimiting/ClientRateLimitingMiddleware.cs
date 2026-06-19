@@ -2,10 +2,13 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using MyProxy.Domain.Entities;
 using MyProxy.Infrastructure.Auth;
+using MyProxy.Infrastructure.Metrics;
 
 namespace MyProxy.Infrastructure.RateLimiting;
 
-public sealed class ClientRateLimitingMiddleware(RequestDelegate next) : IDisposable
+public sealed class ClientRateLimitingMiddleware(
+    RequestDelegate next,
+    IGatewayMetrics gatewayMetrics) : IDisposable
 {
     private static readonly object ClientItemKey = new();
 
@@ -25,6 +28,7 @@ public sealed class ClientRateLimitingMiddleware(RequestDelegate next) : IDispos
 
         if (!lease.IsAcquired)
         {
+            gatewayMetrics.RecordRateLimited(clientContext.Client?.Name ?? "anonymous");
             httpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             return;
         }

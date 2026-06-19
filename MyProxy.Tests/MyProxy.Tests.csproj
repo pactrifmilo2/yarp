@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
@@ -25,6 +26,7 @@
     <ProjectReference Include="..\MyProxy.Domain\MyProxy.Domain.csproj" />
     <ProjectReference Include="..\MyProxy.Infrastructure\MyProxy.Infrastructure.csproj" />
     <ProjectReference Include="..\MyProxy.Admin\MyProxy.Admin.csproj" />
+    <ProjectReference Include="..\MyProxy\MyProxy.csproj" Aliases="GatewayHost" />
   </ItemGroup>
 
 </Project>
