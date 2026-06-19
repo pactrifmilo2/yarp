@@ -183,6 +183,9 @@
                   "if (pm.response.code === 201) {",
                   "    const body = pm.response.json();",
                   "    pm.collectionVariables.set('clientId', body.id);",
+                  "    if (body.apiKey) {",
+                  "        pm.collectionVariables.set('apiKey', body.apiKey);",
+                  "    }",
                   "    if (body.scopes && body.scopes.length) {",
                   "        console.log('Client scopes:', body.scopes.join(', '));",
                   "    }",
@@ -202,7 +205,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman Test Client\",\n  \"apiKey\": \"postman-test-key\",\n  \"scopes\": [\"read:flights\", \"write:flights\"],\n  \"expiresAt\": null,\n  \"rateLimit\": {\n    \"requestLimit\": 100,\n    \"windowSeconds\": 60\n  }\n}"
+              "raw": "{\n  \"name\": \"Postman Test Client\",\n  \"scopes\": [\"read:flights\", \"write:flights\"],\n  \"expiresAt\": null,\n  \"rateLimit\": {\n    \"requestLimit\": 100,\n    \"windowSeconds\": 60\n  }\n}"
             },
             "url": {
               "raw": "{{adminBaseUrl}}/api/control/clients",
@@ -215,7 +218,45 @@
                 "clients"
               ]
             },
-            "description": "Creates a client and saves `clientId` to collection variables. Update `apiKey` variable to `postman-test-key` to use this client on gateway requests."
+            "description": "Creates a client with a server-generated API key. Saves `clientId` and `apiKey` to collection variables (key is shown once)."
+          },
+          "response": []
+        },
+        {
+          "name": "Regenerate API key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.apiKey) {",
+                  "        pm.collectionVariables.set('apiKey', body.apiKey);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{adminBaseUrl}}/api/control/clients/{{clientId}}/regenerate-api-key",
+              "host": [
+                "{{adminBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "control",
+                "clients",
+                "{{clientId}}",
+                "regenerate-api-key"
+              ]
+            },
+            "description": "Generates a new API key for the client. The old key stops working immediately. Saves the new `apiKey` to collection variables."
           },
           "response": []
         },

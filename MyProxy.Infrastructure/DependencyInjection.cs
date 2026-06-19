@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddSingleton<IProxyConfigProvider>(provider =>
             provider.GetRequiredService<DatabaseProxyConfigProvider>());
         services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
+        services.AddSingleton<IApiKeyGenerator, CryptographicApiKeyGenerator>();
         services.AddScoped<IClientApiKeyResolver, DatabaseClientApiKeyResolver>();
         services.AddScoped<GatewayClientContext>();
 

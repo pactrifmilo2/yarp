@@ -74,6 +74,11 @@ public sealed class Client
         ExpiresAt = expiresAt;
     }
 
+    public void RotateApiKey(string apiKeyHash)
+    {
+        ApiKeyHash = RequireValue(apiKeyHash, nameof(apiKeyHash));
+    }
+
     private static string RequireValue(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))

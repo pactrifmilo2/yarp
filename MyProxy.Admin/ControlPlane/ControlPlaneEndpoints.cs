@@ -60,12 +60,14 @@ public static class ControlPlaneEndpoints
         group.MapPost("/clients", async Task<IResult> (
             CreateClientRequest request,
             GatewayDbContext dbContext,
+            IApiKeyGenerator apiKeyGenerator,
             IApiKeyHasher apiKeyHasher,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                var client = Client.Create(request.Name, apiKeyHasher.Hash(request.ApiKey), request.Scopes);
+                var apiKey = apiKeyGenerator.Generate();
+                var client = Client.Create(request.Name, apiKeyHasher.Hash(apiKey), request.Scopes);
                 client.SetExpiration(request.ExpiresAt);
                 if (request.RateLimit is not null)
                 {
@@ -75,12 +77,34 @@ public static class ControlPlaneEndpoints
                 dbContext.Clients.Add(client);
                 await dbContext.SaveChangesAsync(cancellationToken);
 
-                return TypedResults.Created($"/api/control/clients/{client.Id}", ClientResponse.FromEntity(client));
+                return TypedResults.Created(
+                    $"/api/control/clients/{client.Id}",
+                    ClientCreatedResponse.FromEntity(client, apiKey));
             }
             catch (ArgumentException exception)
             {
                 return BadRequest(exception);
             }
+        });
+
+        group.MapPost("/clients/{id:guid}/regenerate-api-key", async Task<Results<Ok<RegenerateApiKeyResponse>, NotFound>> (
+            Guid id,
+            GatewayDbContext dbContext,
+            IApiKeyGenerator apiKeyGenerator,
+            IApiKeyHasher apiKeyHasher,
+            CancellationToken cancellationToken) =>
+        {
+            var client = await dbContext.Clients.SingleOrDefaultAsync(client => client.Id == id, cancellationToken);
+            if (client is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            var apiKey = apiKeyGenerator.Generate();
+            client.RotateApiKey(apiKeyHasher.Hash(apiKey));
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return TypedResults.Ok(new RegenerateApiKeyResponse(apiKey));
         });
 
         group.MapPut("/clients/{id:guid}", async Task<IResult> (
@@ -432,7 +456,6 @@ public static class ControlPlaneEndpoints
 
 public sealed record CreateClientRequest(
     string Name,
-    string ApiKey,
     IReadOnlyCollection<string> Scopes,
     DateTimeOffset? ExpiresAt,
     RateLimitRequest? RateLimit);
@@ -479,6 +502,32 @@ public sealed record RouteRequest(
         route.Update(RouteId, ClusterId, Path, DestinationAddress, IsEnabled, RequiredScopes);
     }
 }
+
+public sealed record ClientCreatedResponse(
+    Guid Id,
+    string Name,
+    string ApiKey,
+    bool IsActive,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ExpiresAt,
+    IReadOnlyCollection<string> Scopes,
+    RateLimitResponse? RateLimit)
+{
+    public static ClientCreatedResponse FromEntity(Client client, string apiKey)
+    {
+        return new ClientCreatedResponse(
+            client.Id,
+            client.Name,
+            apiKey,
+            client.IsActive,
+            client.CreatedAt,
+            client.ExpiresAt,
+            client.Scopes.Select(scope => scope.Name).Order(StringComparer.Ordinal).ToArray(),
+            client.RateLimit is null ? null : RateLimitResponse.FromEntity(client.RateLimit));
+    }
+}
+
+public sealed record RegenerateApiKeyResponse(string ApiKey);
 
 public sealed record ClientResponse(
     Guid Id,

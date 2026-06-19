@@ -1,7 +1,9 @@
 @page "/clients"
 @rendermode InteractiveServer
 @inject GatewayDbContext DbContext
+@inject IApiKeyGenerator ApiKeyGenerator
 @inject IApiKeyHasher ApiKeyHasher
+@inject IJSRuntime JsRuntime
 
 <PageTitle>Khách hàng API</PageTitle>
 
@@ -18,6 +20,31 @@
     <div class="notice">@_message</div>
 }
 
+@if (!string.IsNullOrWhiteSpace(_revealedApiKey))
+{
+    <div class="modal-backdrop">
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="api-key-modal-title">
+            <h2 id="api-key-modal-title">API key mới</h2>
+            <p class="modal-lead">Sao chép key này ngay — sẽ không hiển thị lại sau khi đóng.</p>
+            @if (!string.IsNullOrWhiteSpace(_revealedApiKeyClientName))
+            {
+                <p>Client: <strong>@_revealedApiKeyClientName</strong></p>
+            }
+            <div class="api-key-display">
+                <input readonly value="@_revealedApiKey" aria-label="API key" />
+                <button type="button" @onclick="CopyApiKeyAsync">Sao chép</button>
+            </div>
+            @if (_apiKeyCopied)
+            {
+                <p class="copy-confirmation">Đã sao chép vào clipboard.</p>
+            }
+            <div class="modal-actions">
+                <button class="primary-button" type="button" @onclick="DismissApiKeyModal">Đã lưu key</button>
+            </div>
+        </div>
+    </div>
+}
+
 <section class="panel">
     <h2>Thêm client mới</h2>
     <EditForm Model="_newClient" OnValidSubmit="CreateClientAsync" FormName="create-client">
@@ -26,10 +53,6 @@
             <label>
                 Tên client
                 <InputText @bind-Value="_newClient.Name" />
-            </label>
-            <label>
-                API key ban đầu
-                <InputText @bind-Value="_newClient.ApiKey" />
             </label>
             <label>
                 Scope (phân tách bằng dấu phẩy)
@@ -82,6 +105,9 @@
                             <td>@FormatRateLimit(client.RateLimit)</td>
                             <td>@client.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
                             <td class="actions">
+                                <button type="button" @onclick="() => RegenerateApiKeyAsync(client)">
+                                    Tạo lại key
+                                </button>
                                 <button type="button" @onclick="() => ToggleClientAsync(client)">
                                     @(client.IsActive ? "Tắt" : "Bật")
                                 </button>
@@ -106,6 +132,9 @@
 
     private List<Client> _clients = [];
     private string? _message;
+    private string? _revealedApiKey;
+    private string? _revealedApiKeyClientName;
+    private bool _apiKeyCopied;
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,16 +145,18 @@
     {
         try
         {
+            var clientName = _newClient.Name;
             var scopes = ParseScopes(_newClient.ScopesCsv);
-            var client = Client.Create(_newClient.Name, ApiKeyHasher.Hash(_newClient.ApiKey), scopes);
+            var apiKey = ApiKeyGenerator.Generate();
+            var client = Client.Create(clientName, ApiKeyHasher.Hash(apiKey), scopes);
             client.AssignRateLimit(RateLimit.Create(_newClient.RequestLimit, TimeSpan.FromSeconds(_newClient.WindowSeconds)));
 
             DbContext.Clients.Add(client);
             await DbContext.SaveChangesAsync();
 
-            _message = $"Đã tạo client {_newClient.Name}.";
+            ShowApiKeyModal(apiKey, clientName);
+            _message = $"Đã tạo client {clientName}.";
             _newClient.Name = string.Empty;
-            _newClient.ApiKey = string.Empty;
             _newClient.ScopesCsv = string.Empty;
             await LoadClientsAsync();
         }
@@ -133,6 +164,40 @@
         {
             _message = exception.Message;
         }
+    }
+
+    private async Task RegenerateApiKeyAsync(Client client)
+    {
+        var apiKey = ApiKeyGenerator.Generate();
+        client.RotateApiKey(ApiKeyHasher.Hash(apiKey));
+        await DbContext.SaveChangesAsync();
+        ShowApiKeyModal(apiKey, client.Name);
+        _message = $"Đã tạo lại API key cho client {client.Name}.";
+    }
+
+    private void ShowApiKeyModal(string apiKey, string clientName)
+    {
+        _revealedApiKey = apiKey;
+        _revealedApiKeyClientName = clientName;
+        _apiKeyCopied = false;
+    }
+
+    private void DismissApiKeyModal()
+    {
+        _revealedApiKey = null;
+        _revealedApiKeyClientName = null;
+        _apiKeyCopied = false;
+    }
+
+    private async Task CopyApiKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_revealedApiKey))
+        {
+            return;
+        }
+
+        await JsRuntime.InvokeVoidAsync("myProxyCopyText", _revealedApiKey);
+        _apiKeyCopied = true;
     }
 
     private async Task ToggleClientAsync(Client client)
@@ -175,8 +240,6 @@
     private sealed class NewClientForm
     {
         public string Name { get; set; } = string.Empty;
-
-        public string ApiKey { get; set; } = string.Empty;
 
         public string ScopesCsv { get; set; } = string.Empty;
 

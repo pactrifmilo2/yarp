@@ -26,7 +26,6 @@ public class ControlPlaneApiTests
         var createResponse = await client.PostAsJsonAsync("/api/control/clients", new
         {
             name = "Flight Ops",
-            apiKey = "secret-key",
             scopes = new[] { "read:flights", "write:flights" },
             expiresAt = DateTimeOffset.UtcNow.AddDays(30),
             rateLimit = new
@@ -39,6 +38,9 @@ public class ControlPlaneApiTests
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var created = await ReadJsonAsync(createResponse);
         var id = created.RootElement.GetProperty("id").GetGuid();
+        var apiKey = created.RootElement.GetProperty("apiKey").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(apiKey));
+        Assert.StartsWith("mp_", apiKey, StringComparison.Ordinal);
 
         var list = await client.GetFromJsonAsync<JsonElement>("/api/control/clients");
         var listedClient = Assert.Single(list.EnumerateArray());
@@ -66,11 +68,37 @@ public class ControlPlaneApiTests
         Assert.Equal(new[] { "read:flights" }, ReadStringArray(updated.RootElement, "scopes"));
         Assert.Equal(30, updated.RootElement.GetProperty("rateLimit").GetProperty("requestLimit").GetInt32());
 
+        var regenerateResponse = await client.PostAsync($"/api/control/clients/{id}/regenerate-api-key", null);
+        Assert.Equal(HttpStatusCode.OK, regenerateResponse.StatusCode);
+        var regenerated = await ReadJsonAsync(regenerateResponse);
+        var newApiKey = regenerated.RootElement.GetProperty("apiKey").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(newApiKey));
+        Assert.NotEqual(apiKey, newApiKey);
+
         var deleteResponse = await client.DeleteAsync($"/api/control/clients/{id}");
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
         var emptyList = await client.GetFromJsonAsync<JsonElement>("/api/control/clients");
         Assert.Empty(emptyList.EnumerateArray());
+    }
+
+    [Fact]
+    public async Task List_clients_does_not_return_api_keys()
+    {
+        using var host = await CreateHostAsync();
+        var client = host.GetTestClient();
+
+        await client.PostAsJsonAsync("/api/control/clients", new
+        {
+            name = "Flight Ops",
+            scopes = new[] { "read:flights" },
+            expiresAt = (DateTimeOffset?)null,
+            rateLimit = (object?)null,
+        });
+
+        var list = await client.GetFromJsonAsync<JsonElement>("/api/control/clients");
+        var listedClient = Assert.Single(list.EnumerateArray());
+        Assert.False(listedClient.TryGetProperty("apiKey", out _));
     }
 
     [Fact]
@@ -165,6 +193,7 @@ public class ControlPlaneApiTests
                         services.AddScoped(provider =>
                             provider.GetRequiredService<IDbContextFactory<GatewayDbContext>>().CreateDbContext());
                         services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
+                        services.AddSingleton<IApiKeyGenerator, CryptographicApiKeyGenerator>();
                         services.AddSingleton<DatabaseProxyConfigProvider>();
                     })
                     .Configure(app =>

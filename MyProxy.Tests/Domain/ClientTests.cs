@@ -24,4 +24,22 @@ public class ClientTests
         Assert.Throws<ArgumentException>(
             () => Client.Create("Flight Ops", "sha256-key", new[] { "readflights" }));
     }
+
+    [Fact]
+    public void RotateApiKey_replaces_existing_hash()
+    {
+        var client = Client.Create("Flight Ops", "old-hash", new[] { "read:flights" });
+
+        client.RotateApiKey("new-hash");
+
+        Assert.Equal("new-hash", client.ApiKeyHash);
+    }
+
+    [Fact]
+    public void RotateApiKey_rejects_empty_hash()
+    {
+        var client = Client.Create("Flight Ops", "old-hash", new[] { "read:flights" });
+
+        Assert.Throws<ArgumentException>(() => client.RotateApiKey(" "));
+    }
 }

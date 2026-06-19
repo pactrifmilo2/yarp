@@ -61,6 +61,7 @@ public class OpenApiTests
         builder.Services.AddScoped(provider =>
             provider.GetRequiredService<IDbContextFactory<GatewayDbContext>>().CreateDbContext());
         builder.Services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
+        builder.Services.AddSingleton<IApiKeyGenerator, CryptographicApiKeyGenerator>();
         builder.Services.AddSingleton<DatabaseProxyConfigProvider>();
 
         var app = builder.Build();
