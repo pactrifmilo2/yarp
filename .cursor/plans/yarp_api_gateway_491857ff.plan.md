@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: phase7
     content: Wire OpenTelemetry metrics, expose Prometheus endpoint, and provision a Grafana monitoring dashboard (or custom Vietnamese dashboard from DB aggregates) matching mockup screen 3.
-    status: pending
+    status: completed
 isProject: false
 ---
 

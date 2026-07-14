@@ -5,13 +5,14 @@ using MyProxy.Domain.Entities;
 using MyProxy.Infrastructure.Auth;
 using MyProxy.Infrastructure.Monitoring;
 using MyProxy.Infrastructure.Persistence;
-using MyProxy.Infrastructure.Proxy;
 
 namespace MyProxy.Admin.ControlPlane;
 
 public static class ControlPlaneEndpoints
 {
-    public static IEndpointRouteBuilder MapControlPlaneApi(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapControlPlaneApi(
+        this IEndpointRouteBuilder endpoints,
+        GatewayReloadClient gatewayReloadClient)
     {
         var group = endpoints.MapGroup("/api/control")
             .WithTags("Control Plane")
@@ -21,7 +22,7 @@ public static class ControlPlaneEndpoints
         MapClientEndpoints(group);
         MapRateLimitEndpoints(group);
         MapScopeEndpoints(group);
-        MapRouteEndpoints(group);
+        MapRouteEndpoints(group, gatewayReloadClient);
         MapAuditEndpoints(group);
         MapMonitoringEndpoints(group);
 
@@ -315,7 +316,7 @@ public static class ControlPlaneEndpoints
         });
     }
 
-    private static void MapRouteEndpoints(RouteGroupBuilder group)
+    private static void MapRouteEndpoints(RouteGroupBuilder group, GatewayReloadClient gatewayReloadClient)
     {
         group.MapGet("/routes", async (GatewayDbContext dbContext, CancellationToken cancellationToken) =>
         {
@@ -347,7 +348,6 @@ public static class ControlPlaneEndpoints
         group.MapPost("/routes", async Task<IResult> (
             RouteRequest request,
             GatewayDbContext dbContext,
-            DatabaseProxyConfigProvider proxyConfigProvider,
             CancellationToken cancellationToken) =>
         {
             try
@@ -355,7 +355,7 @@ public static class ControlPlaneEndpoints
                 var route = request.ToEntity();
                 dbContext.Routes.Add(route);
                 await dbContext.SaveChangesAsync(cancellationToken);
-                proxyConfigProvider.Reload();
+                await gatewayReloadClient.ReloadAsync(cancellationToken);
 
                 return TypedResults.Created($"/api/control/routes/{route.Id}", RouteResponse.FromEntity(route));
             }
@@ -369,7 +369,6 @@ public static class ControlPlaneEndpoints
             Guid id,
             RouteRequest request,
             GatewayDbContext dbContext,
-            DatabaseProxyConfigProvider proxyConfigProvider,
             CancellationToken cancellationToken) =>
         {
             var route = await dbContext.Routes
@@ -395,7 +394,7 @@ public static class ControlPlaneEndpoints
                 request.ApplyTo(route);
                 dbContext.Scopes.AddRange(route.RequiredScopes);
                 await dbContext.SaveChangesAsync(cancellationToken);
-                proxyConfigProvider.Reload();
+                await gatewayReloadClient.ReloadAsync(cancellationToken);
 
                 return TypedResults.Ok(RouteResponse.FromEntity(route));
             }
@@ -408,7 +407,6 @@ public static class ControlPlaneEndpoints
         group.MapDelete("/routes/{id:guid}", async Task<Results<NoContent, NotFound>> (
             Guid id,
             GatewayDbContext dbContext,
-            DatabaseProxyConfigProvider proxyConfigProvider,
             CancellationToken cancellationToken) =>
         {
             var route = await dbContext.Routes.SingleOrDefaultAsync(route => route.Id == id, cancellationToken);
@@ -419,7 +417,7 @@ public static class ControlPlaneEndpoints
 
             dbContext.Routes.Remove(route);
             await dbContext.SaveChangesAsync(cancellationToken);
-            proxyConfigProvider.Reload();
+            await gatewayReloadClient.ReloadAsync(cancellationToken);
 
             return TypedResults.NoContent();
         });

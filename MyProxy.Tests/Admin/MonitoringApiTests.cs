@@ -12,7 +12,6 @@ using MyProxy.Domain.Entities;
 using MyProxy.Infrastructure.Auth;
 using MyProxy.Infrastructure.Monitoring;
 using MyProxy.Infrastructure.Persistence;
-using MyProxy.Infrastructure.Proxy;
 
 namespace MyProxy.Tests.Admin;
 
@@ -65,14 +64,15 @@ public class MonitoringApiTests
                             provider.GetRequiredService<IDbContextFactory<GatewayDbContext>>().CreateDbContext());
                         services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
                         services.AddSingleton<IApiKeyGenerator, CryptographicApiKeyGenerator>();
-                        services.AddSingleton<DatabaseProxyConfigProvider>();
+                        services.AddSingleton(GatewayReloadClientTestFactory.Create());
                         services.AddSingleton<TimeProvider>(new FixedTimeProvider(now));
                         services.AddScoped<MonitoringSummaryQuery>();
                     })
                     .Configure(app =>
                     {
                         app.UseRouting();
-                        app.UseEndpoints(endpoints => endpoints.MapControlPlaneApi());
+                        var gatewayReloadClient = app.ApplicationServices.GetRequiredService<GatewayReloadClient>();
+                        app.UseEndpoints(endpoints => endpoints.MapControlPlaneApi(gatewayReloadClient));
                     });
             })
             .StartAsync();

@@ -8,7 +8,6 @@ using MyProxy.Admin.ControlPlane;
 using MyProxy.Admin.OpenApi;
 using MyProxy.Infrastructure.Auth;
 using MyProxy.Infrastructure.Persistence;
-using MyProxy.Infrastructure.Proxy;
 
 namespace MyProxy.Tests.Admin;
 
@@ -62,12 +61,14 @@ public class OpenApiTests
             provider.GetRequiredService<IDbContextFactory<GatewayDbContext>>().CreateDbContext());
         builder.Services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
         builder.Services.AddSingleton<IApiKeyGenerator, CryptographicApiKeyGenerator>();
-        builder.Services.AddSingleton<DatabaseProxyConfigProvider>();
+        builder.Services.AddSingleton(GatewayReloadClientTestFactory.Create());
 
         var app = builder.Build();
         app.UseRouting();
         app.MapGatewayOpenApi();
-        app.MapControlPlaneApi();
+
+        var gatewayReloadClient = app.Services.GetRequiredService<GatewayReloadClient>();
+        app.MapControlPlaneApi(gatewayReloadClient);
 
         await app.StartAsync();
         return app;

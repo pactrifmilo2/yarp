@@ -13,6 +13,11 @@ builder.Services.AddGatewayOpenApi();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddHttpClient<GatewayReloadClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Gateway:BaseUrl"]!);
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -30,7 +35,10 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapGatewayOpenApi();
 app.MapDocsEndpoints();
-app.MapControlPlaneApi();
+
+var gatewayReloadClient = app.Services.GetRequiredService<GatewayReloadClient>();
+app.MapControlPlaneApi(gatewayReloadClient);
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
