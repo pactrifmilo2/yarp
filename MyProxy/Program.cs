@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,12 +19,26 @@ builder.Services.AddReverseProxy();
 
 var app = builder.Build();
 
+app.MapGet("/health", () => TypedResults.Ok(new
+{
+    service = "MyProxy",
+    status = "healthy",
+}));
+
 app.MapPrometheusScrapingEndpoint()
     .DisableHttpMetrics();
 
 // Internal endpoint for the Admin to trigger a config reload after route changes.
-app.MapPost("/api/reload", (DatabaseProxyConfigProvider proxyConfigProvider) =>
+app.MapPost("/api/reload", IResult (
+    HttpContext httpContext,
+    DatabaseProxyConfigProvider proxyConfigProvider) =>
 {
+    var remoteIpAddress = httpContext.Connection.RemoteIpAddress;
+    if (remoteIpAddress is null || !IPAddress.IsLoopback(remoteIpAddress))
+    {
+        return TypedResults.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
     proxyConfigProvider.Reload();
     return TypedResults.Ok(new { message = "Proxy config reloaded." });
 });

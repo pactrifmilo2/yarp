@@ -5,6 +5,7 @@ using MyProxy.Admin.OpenApi;
 using MyProxy.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+var useHttpsRedirection = builder.Configuration.GetValue<bool>("Hosting:UseHttpsRedirection");
 
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
 builder.Services.AddGatewayOpenApi();
@@ -24,17 +25,28 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    if (useHttpsRedirection)
+    {
+        app.UseHsts();
+    }
+}
+
+if (useHttpsRedirection)
+{
+    app.UseHttpsRedirection();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapGatewayOpenApi();
 app.MapDocsEndpoints();
+app.MapGet("/health", () => TypedResults.Ok(new
+{
+    service = "MyProxy.Admin",
+    status = "healthy",
+}));
 
 var gatewayReloadClient = app.Services.GetRequiredService<GatewayReloadClient>();
 app.MapControlPlaneApi(gatewayReloadClient);
