@@ -37,7 +37,8 @@ public sealed class AuditLoggingMiddleware(
             httpContext.Request.Method,
             endpoint,
             httpContext.Response.StatusCode,
-            stopwatch.Elapsed);
+            stopwatch.Elapsed,
+            AuditQueryStringSanitizer.Sanitize(httpContext.Request.Query));
 
         dbContext.AuditEntries.Add(auditEntry);
         await dbContext.SaveChangesAsync(httpContext.RequestAborted);

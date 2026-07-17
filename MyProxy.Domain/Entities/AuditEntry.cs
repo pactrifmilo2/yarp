@@ -15,7 +15,8 @@ public sealed class AuditEntry
         string method,
         string path,
         int statusCode,
-        TimeSpan latency)
+        TimeSpan latency,
+        string? queryString)
     {
         Id = Guid.NewGuid();
         Timestamp = DateTimeOffset.UtcNow;
@@ -23,6 +24,7 @@ public sealed class AuditEntry
         IpAddress = RequireValue(ipAddress, nameof(ipAddress));
         Method = RequireValue(method, nameof(method)).ToUpperInvariant();
         Path = RequireValue(path, nameof(path));
+        QueryString = string.IsNullOrWhiteSpace(queryString) ? null : queryString.Trim();
         StatusCode = statusCode;
         Latency = latency;
     }
@@ -41,6 +43,8 @@ public sealed class AuditEntry
 
     public string Path { get; private set; }
 
+    public string? QueryString { get; private set; }
+
     public int StatusCode { get; private set; }
 
     public TimeSpan Latency { get; private set; }
@@ -51,7 +55,8 @@ public sealed class AuditEntry
         string method,
         string path,
         int statusCode,
-        TimeSpan latency)
+        TimeSpan latency,
+        string? queryString = null)
     {
         if (statusCode is < 100 or > 599)
         {
@@ -63,7 +68,7 @@ public sealed class AuditEntry
             throw new ArgumentOutOfRangeException(nameof(latency), "Latency cannot be negative.");
         }
 
-        return new AuditEntry(clientId, ipAddress, method, path, statusCode, latency);
+        return new AuditEntry(clientId, ipAddress, method, path, statusCode, latency, queryString);
     }
 
     private static string RequireValue(string value, string parameterName)

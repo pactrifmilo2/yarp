@@ -17,7 +17,11 @@ public class AuditLoggingMiddlewareTests
         var options = CreateOptions();
         var client = Client.Create("Flight Ops", "api-key-hash", new[] { "read:flights" });
         await SaveClientAsync(options, client);
-        var httpContext = CreateHttpContext("/api/flights", "POST", IPAddress.Parse("10.10.0.5"));
+        var httpContext = CreateHttpContext(
+            "/api/flights",
+            "POST",
+            IPAddress.Parse("10.10.0.5"),
+            "?page_size=20&page_index=1&token=do-not-store");
         var clientContext = new GatewayClientContext
         {
             Client = client,
@@ -37,6 +41,7 @@ public class AuditLoggingMiddlewareTests
         Assert.Equal("10.10.0.5", auditEntry.IpAddress);
         Assert.Equal("POST", auditEntry.Method);
         Assert.Equal("/api/flights", auditEntry.Path);
+        Assert.Equal("?page_index=1&page_size=20&token=%5BREDACTED%5D", auditEntry.QueryString);
         Assert.Equal(StatusCodes.Status202Accepted, auditEntry.StatusCode);
         Assert.True(auditEntry.Latency >= TimeSpan.Zero);
         Assert.True(auditEntry.Timestamp <= DateTimeOffset.UtcNow);
@@ -66,18 +71,24 @@ public class AuditLoggingMiddlewareTests
         Assert.Equal("127.0.0.1", auditEntry.IpAddress);
         Assert.Equal("GET", auditEntry.Method);
         Assert.Equal("/api/weather", auditEntry.Path);
+        Assert.Null(auditEntry.QueryString);
         Assert.Equal(StatusCodes.Status401Unauthorized, auditEntry.StatusCode);
         Assert.True(auditEntry.Latency >= TimeSpan.Zero);
         Assert.Equal("anonymous", metrics.LastRequest?.ClientName);
         Assert.Equal(StatusCodes.Status401Unauthorized, metrics.LastRequest?.StatusCode);
     }
 
-    private static DefaultHttpContext CreateHttpContext(string path, string method, IPAddress remoteIpAddress)
+    private static DefaultHttpContext CreateHttpContext(
+        string path,
+        string method,
+        IPAddress remoteIpAddress,
+        string? queryString = null)
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Connection.RemoteIpAddress = remoteIpAddress;
         httpContext.Request.Path = path;
         httpContext.Request.Method = method;
+        httpContext.Request.QueryString = new QueryString(queryString);
 
         return httpContext;
     }

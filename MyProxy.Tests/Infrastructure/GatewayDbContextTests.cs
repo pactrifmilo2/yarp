@@ -28,7 +28,8 @@ public class GatewayDbContextTests
             "GET",
             "/api/flights",
             200,
-            TimeSpan.FromMilliseconds(42));
+            TimeSpan.FromMilliseconds(42),
+            "?page=2");
 
         dbContext.Clients.Add(client);
         dbContext.Routes.Add(route);
@@ -48,6 +49,7 @@ public class GatewayDbContextTests
         Assert.Equal(100, savedClient.RateLimit?.RequestLimit);
         Assert.Equal("read:flights", Assert.Single(savedRoute.RequiredScopes).Name);
         Assert.Equal(client.Id, savedAuditEntry.ClientId);
+        Assert.Equal("?page=2", savedAuditEntry.QueryString);
     }
 
     [Fact]

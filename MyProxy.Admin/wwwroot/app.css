@@ -557,6 +557,13 @@ th {
     min-width: 150px;
 }
 
+.query-parameters {
+    display: inline-block;
+    max-width: 32rem;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }

@@ -611,6 +611,7 @@ public sealed record AuditEntryResponse(
     string IpAddress,
     string Method,
     string Path,
+    string? QueryString,
     int StatusCode,
     double LatencyMilliseconds)
 {
@@ -624,6 +625,7 @@ public sealed record AuditEntryResponse(
             auditEntry.IpAddress,
             auditEntry.Method,
             auditEntry.Path,
+            auditEntry.QueryString,
             auditEntry.StatusCode,
             auditEntry.Latency.TotalMilliseconds);
     }

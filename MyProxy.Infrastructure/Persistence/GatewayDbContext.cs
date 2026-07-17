@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MyProxy.Domain.Entities;
+using MyProxy.Infrastructure.Auditing;
 
 namespace MyProxy.Infrastructure.Persistence;
 
@@ -111,6 +112,9 @@ public sealed class GatewayDbContext(DbContextOptions<GatewayDbContext> options)
         auditEntry.Property(entity => entity.IpAddress).HasColumnName("ip_address").HasMaxLength(128).IsRequired();
         auditEntry.Property(entity => entity.Method).HasColumnName("method").HasMaxLength(16).IsRequired();
         auditEntry.Property(entity => entity.Path).HasColumnName("path").HasMaxLength(2048).IsRequired();
+        auditEntry.Property(entity => entity.QueryString)
+            .HasColumnName("query_string")
+            .HasMaxLength(AuditQueryStringSanitizer.MaxStoredLength);
         auditEntry.Property(entity => entity.StatusCode).HasColumnName("status_code").IsRequired();
         auditEntry.Property(entity => entity.Latency).HasColumnName("latency").IsRequired();
         auditEntry.HasIndex(entity => entity.Timestamp);

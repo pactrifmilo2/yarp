@@ -35,6 +35,7 @@
                         <th>IP</th>
                         <th>Phương thức</th>
                         <th>Endpoint</th>
+                        <th>Tham số</th>
                         <th>Trạng thái</th>
                         <th>Độ trễ</th>
                     </tr>
@@ -48,6 +49,16 @@
                             <td>@entry.IpAddress</td>
                             <td>@entry.Method</td>
                             <td>@entry.Path</td>
+                            <td>
+                                @if (entry.QueryString is null)
+                                {
+                                    <span>-</span>
+                                }
+                                else
+                                {
+                                    <code class="query-parameters" title="@entry.QueryString">@entry.QueryString</code>
+                                }
+                            </td>
                             <td>
                                 <span class="status @(entry.StatusCode < 400 ? "status-ok" : "status-error")">
                                     @entry.StatusCode
