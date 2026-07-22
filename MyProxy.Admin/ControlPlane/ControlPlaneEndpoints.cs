@@ -22,6 +22,7 @@ public static class ControlPlaneEndpoints
         MapClientEndpoints(group);
         MapRateLimitEndpoints(group);
         MapScopeEndpoints(group);
+        MapApiKeyBypassAddressEndpoints(group, gatewayReloadClient);
         MapRouteEndpoints(group, gatewayReloadClient);
         MapAuditEndpoints(group);
         MapMonitoringEndpoints(group);
@@ -423,6 +424,94 @@ public static class ControlPlaneEndpoints
         });
     }
 
+    private static void MapApiKeyBypassAddressEndpoints(
+        RouteGroupBuilder group,
+        GatewayReloadClient gatewayReloadClient)
+    {
+        group.MapGet("/ip-bypass-addresses", async (
+            GatewayDbContext dbContext,
+            CancellationToken cancellationToken) =>
+        {
+            var addresses = await dbContext.ApiKeyBypassAddresses
+                .AsNoTracking()
+                .OrderBy(address => address.Address)
+                .Select(address => ApiKeyBypassAddressResponse.FromEntity(address))
+                .ToListAsync(cancellationToken);
+
+            return TypedResults.Ok(addresses);
+        });
+
+        group.MapPost("/ip-bypass-addresses", async Task<IResult> (
+            CreateApiKeyBypassAddressRequest request,
+            GatewayDbContext dbContext,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var address = ApiKeyBypassAddress.Create(request.Address, request.Description);
+                if (await dbContext.ApiKeyBypassAddresses.AnyAsync(
+                        existing => existing.Address == address.Address,
+                        cancellationToken))
+                {
+                    return BadRequest(new ArgumentException("This IP address is already configured."));
+                }
+
+                dbContext.ApiKeyBypassAddresses.Add(address);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await gatewayReloadClient.ReloadAsync(cancellationToken);
+
+                return TypedResults.Created(
+                    $"/api/control/ip-bypass-addresses/{address.Id}",
+                    ApiKeyBypassAddressResponse.FromEntity(address));
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(exception);
+            }
+        });
+
+        group.MapPut("/ip-bypass-addresses/{id:guid}", async Task<IResult> (
+            Guid id,
+            UpdateApiKeyBypassAddressRequest request,
+            GatewayDbContext dbContext,
+            CancellationToken cancellationToken) =>
+        {
+            var address = await dbContext.ApiKeyBypassAddresses.SingleOrDefaultAsync(
+                address => address.Id == id,
+                cancellationToken);
+            if (address is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            address.Update(request.Description, request.IsEnabled);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await gatewayReloadClient.ReloadAsync(cancellationToken);
+
+            return TypedResults.Ok(ApiKeyBypassAddressResponse.FromEntity(address));
+        });
+
+        group.MapDelete("/ip-bypass-addresses/{id:guid}", async Task<Results<NoContent, NotFound>> (
+            Guid id,
+            GatewayDbContext dbContext,
+            CancellationToken cancellationToken) =>
+        {
+            var address = await dbContext.ApiKeyBypassAddresses.SingleOrDefaultAsync(
+                address => address.Id == id,
+                cancellationToken);
+            if (address is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            dbContext.ApiKeyBypassAddresses.Remove(address);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await gatewayReloadClient.ReloadAsync(cancellationToken);
+
+            return TypedResults.NoContent();
+        });
+    }
+
     private static void MapAuditEndpoints(RouteGroupBuilder group)
     {
         group.MapGet("/audit-entries", async (
@@ -493,6 +582,10 @@ public sealed record RateLimitRequest(int RequestLimit, int WindowSeconds)
 }
 
 public sealed record ScopeRequest(string Name);
+
+public sealed record CreateApiKeyBypassAddressRequest(string Address, string? Description);
+
+public sealed record UpdateApiKeyBypassAddressRequest(string? Description, bool IsEnabled);
 
 public sealed record RouteRequest(
     string RouteId,
@@ -576,6 +669,24 @@ public sealed record ScopeResponse(Guid Id, string Name)
     public static ScopeResponse FromEntity(Scope scope)
     {
         return new ScopeResponse(scope.Id, scope.Name);
+    }
+}
+
+public sealed record ApiKeyBypassAddressResponse(
+    Guid Id,
+    string Address,
+    string? Description,
+    bool IsEnabled,
+    DateTimeOffset CreatedAt)
+{
+    public static ApiKeyBypassAddressResponse FromEntity(ApiKeyBypassAddress address)
+    {
+        return new ApiKeyBypassAddressResponse(
+            address.Id,
+            address.Address,
+            address.Description,
+            address.IsEnabled,
+            address.CreatedAt);
     }
 }
 

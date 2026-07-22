@@ -16,6 +16,8 @@ public sealed class GatewayDbContext(DbContextOptions<GatewayDbContext> options)
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
+    public DbSet<ApiKeyBypassAddress> ApiKeyBypassAddresses => Set<ApiKeyBypassAddress>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureClients(modelBuilder);
@@ -23,6 +25,7 @@ public sealed class GatewayDbContext(DbContextOptions<GatewayDbContext> options)
         ConfigureRateLimits(modelBuilder);
         ConfigureRoutes(modelBuilder);
         ConfigureAuditEntries(modelBuilder);
+        ConfigureApiKeyBypassAddresses(modelBuilder);
     }
 
     private static void ConfigureClients(ModelBuilder modelBuilder)
@@ -123,5 +126,28 @@ public sealed class GatewayDbContext(DbContextOptions<GatewayDbContext> options)
             .WithMany()
             .HasForeignKey(entity => entity.ClientId)
             .OnDelete(DeleteBehavior.SetNull);
+    }
+
+    private static void ConfigureApiKeyBypassAddresses(ModelBuilder modelBuilder)
+    {
+        var bypassAddress = modelBuilder.Entity<ApiKeyBypassAddress>();
+
+        bypassAddress.ToTable("api_key_bypass_addresses");
+        bypassAddress.HasKey(entity => entity.Id);
+        bypassAddress.Property(entity => entity.Id).HasColumnName("id");
+        bypassAddress.Property(entity => entity.Address)
+            .HasColumnName("address")
+            .HasMaxLength(64)
+            .IsRequired();
+        bypassAddress.Property(entity => entity.Description)
+            .HasColumnName("description")
+            .HasMaxLength(300);
+        bypassAddress.Property(entity => entity.IsEnabled)
+            .HasColumnName("is_enabled")
+            .IsRequired();
+        bypassAddress.Property(entity => entity.CreatedAt)
+            .HasColumnName("created_at")
+            .IsRequired();
+        bypassAddress.HasIndex(entity => entity.Address).IsUnique();
     }
 }

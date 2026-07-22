@@ -145,6 +145,48 @@ public class ControlPlaneApiTests
     }
 
     [Fact]
+    public async Task Ip_bypass_endpoints_create_toggle_list_and_delete_addresses()
+    {
+        using var host = await CreateHostAsync();
+        var client = host.GetTestClient();
+
+        var createResponse = await client.PostAsJsonAsync("/api/control/ip-bypass-addresses", new
+        {
+            address = "::ffff:172.29.187.90",
+            description = "ATFM server",
+        });
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var created = await ReadJsonAsync(createResponse);
+        var id = created.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal("172.29.187.90", created.RootElement.GetProperty("address").GetString());
+        Assert.True(created.RootElement.GetProperty("isEnabled").GetBoolean());
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/control/ip-bypass-addresses/{id}",
+            new
+            {
+                description = "Temporarily disabled",
+                isEnabled = false,
+            });
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updated = await ReadJsonAsync(updateResponse);
+        Assert.False(updated.RootElement.GetProperty("isEnabled").GetBoolean());
+
+        var list = await client.GetFromJsonAsync<JsonElement>("/api/control/ip-bypass-addresses");
+        var listedAddress = Assert.Single(list.EnumerateArray());
+        Assert.Equal("172.29.187.90", listedAddress.GetProperty("address").GetString());
+        Assert.Equal("Temporarily disabled", listedAddress.GetProperty("description").GetString());
+
+        var deleteResponse = await client.DeleteAsync($"/api/control/ip-bypass-addresses/{id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        var emptyList = await client.GetFromJsonAsync<JsonElement>("/api/control/ip-bypass-addresses");
+        Assert.Empty(emptyList.EnumerateArray());
+    }
+
+    [Fact]
     public async Task Audit_entries_endpoint_returns_newest_entries_with_client_name()
     {
         var databaseName = Guid.NewGuid().ToString();

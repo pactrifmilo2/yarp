@@ -1,0 +1,164 @@
+@page "/ip-bypass"
+@rendermode InteractiveServer
+@inject GatewayDbContext DbContext
+@inject GatewayReloadClient GatewayReloadClient
+
+<PageTitle>IP không cần API key</PageTitle>
+
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Bảo mật Gateway</p>
+        <h1>IP không cần API key</h1>
+        <p>Thiết bị có địa chỉ IP đang bật trong danh sách này được phép gọi mọi proxy route mà không cần header X-API-Key.</p>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="notice">@_message</div>
+}
+
+<section class="panel">
+    <h2>Thêm địa chỉ IP</h2>
+    <EditForm Model="_newAddress" OnValidSubmit="CreateAddressAsync" FormName="create-ip-bypass-address">
+        <div class="form-grid">
+            <label>
+                Địa chỉ IPv4 hoặc IPv6
+                <InputText @bind-Value="_newAddress.Address" placeholder="Ví dụ: 172.29.187.90" />
+            </label>
+            <label>
+                Mô tả thiết bị
+                <InputText @bind-Value="_newAddress.Description" placeholder="Ví dụ: Máy chủ ATFM" />
+            </label>
+        </div>
+        <button class="primary-button" type="submit">Thêm IP</button>
+    </EditForm>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <h2>Danh sách cho phép</h2>
+            <p>Thay đổi được lưu vào cơ sở dữ liệu và áp dụng ngay cho Gateway.</p>
+        </div>
+        <button type="button" @onclick="LoadAddressesAsync">Tải lại</button>
+    </div>
+
+    @if (_addresses.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>Chưa có IP nào được cấu hình</strong>
+            <p>Mọi request vẫn phải cung cấp API key.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Địa chỉ IP</th>
+                        <th>Mô tả</th>
+                        <th>Trạng thái</th>
+                        <th>Ngày thêm</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var address in _addresses)
+                    {
+                        <tr>
+                            <td><code>@address.Address</code></td>
+                            <td>@(address.Description ?? "-")</td>
+                            <td>
+                                <span class="status @(address.IsEnabled ? "status-ok" : "status-muted")">
+                                    @(address.IsEnabled ? "Đang cho phép" : "Đã tắt")
+                                </span>
+                            </td>
+                            <td>@address.CreatedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</td>
+                            <td class="actions">
+                                <button type="button" @onclick="() => ToggleAddressAsync(address)">
+                                    @(address.IsEnabled ? "Tắt" : "Bật")
+                                </button>
+                                <button type="button" class="danger" @onclick="() => DeleteAddressAsync(address)">
+                                    Xóa
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly NewAddressForm _newAddress = new();
+    private List<ApiKeyBypassAddress> _addresses = [];
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAddressesAsync();
+    }
+
+    private async Task CreateAddressAsync()
+    {
+        try
+        {
+            var address = ApiKeyBypassAddress.Create(_newAddress.Address, _newAddress.Description);
+            if (await DbContext.ApiKeyBypassAddresses.AnyAsync(existing => existing.Address == address.Address))
+            {
+                _message = "Địa chỉ IP này đã có trong danh sách.";
+                return;
+            }
+
+            DbContext.ApiKeyBypassAddresses.Add(address);
+            await DbContext.SaveChangesAsync();
+            await GatewayReloadClient.ReloadAsync();
+
+            _newAddress.Address = string.Empty;
+            _newAddress.Description = string.Empty;
+            _message = $"Đã thêm {address.Address}.";
+            await LoadAddressesAsync();
+        }
+        catch (ArgumentException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+
+    private async Task ToggleAddressAsync(ApiKeyBypassAddress address)
+    {
+        address.Update(address.Description, !address.IsEnabled);
+        await DbContext.SaveChangesAsync();
+        await GatewayReloadClient.ReloadAsync();
+        _message = address.IsEnabled
+            ? $"Đã bật {address.Address}."
+            : $"Đã tắt {address.Address}.";
+        await LoadAddressesAsync();
+    }
+
+    private async Task DeleteAddressAsync(ApiKeyBypassAddress address)
+    {
+        DbContext.ApiKeyBypassAddresses.Remove(address);
+        await DbContext.SaveChangesAsync();
+        await GatewayReloadClient.ReloadAsync();
+        _message = $"Đã xóa {address.Address}.";
+        await LoadAddressesAsync();
+    }
+
+    private async Task LoadAddressesAsync()
+    {
+        _addresses = await DbContext.ApiKeyBypassAddresses
+            .OrderBy(address => address.Address)
+            .ToListAsync();
+    }
+
+    private sealed class NewAddressForm
+    {
+        public string Address { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+    }
+}

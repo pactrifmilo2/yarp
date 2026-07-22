@@ -49,7 +49,8 @@ app.MapPrometheusScrapingEndpoint()
 // Internal endpoint for the Admin to trigger a config reload after route changes.
 app.MapPost("/api/reload", IResult (
     HttpContext httpContext,
-    DatabaseProxyConfigProvider proxyConfigProvider) =>
+    DatabaseProxyConfigProvider proxyConfigProvider,
+    IApiKeyBypassPolicy apiKeyBypassPolicy) =>
 {
     var remoteIpAddress = httpContext.Connection.RemoteIpAddress;
     if (remoteIpAddress is null || !IPAddress.IsLoopback(remoteIpAddress))
@@ -58,6 +59,7 @@ app.MapPost("/api/reload", IResult (
     }
 
     proxyConfigProvider.Reload();
+    apiKeyBypassPolicy.Reload();
     return TypedResults.Ok(new { message = "Proxy config reloaded." });
 });
 

@@ -31,9 +31,12 @@ public class GatewayDbContextTests
             TimeSpan.FromMilliseconds(42),
             "?page=2");
 
+        var bypassAddress = ApiKeyBypassAddress.Create("::ffff:10.0.0.5", "Operations workstation");
+
         dbContext.Clients.Add(client);
         dbContext.Routes.Add(route);
         dbContext.AuditEntries.Add(auditEntry);
+        dbContext.ApiKeyBypassAddresses.Add(bypassAddress);
         await dbContext.SaveChangesAsync();
 
         var savedClient = await dbContext.Clients
@@ -44,12 +47,15 @@ public class GatewayDbContextTests
             .Include(saved => saved.RequiredScopes)
             .SingleAsync();
         var savedAuditEntry = await dbContext.AuditEntries.SingleAsync();
+        var savedBypassAddress = await dbContext.ApiKeyBypassAddresses.SingleAsync();
 
         Assert.Equal("read:flights", Assert.Single(savedClient.Scopes).Name);
         Assert.Equal(100, savedClient.RateLimit?.RequestLimit);
         Assert.Equal("read:flights", Assert.Single(savedRoute.RequiredScopes).Name);
         Assert.Equal(client.Id, savedAuditEntry.ClientId);
         Assert.Equal("?page=2", savedAuditEntry.QueryString);
+        Assert.Equal("10.0.0.5", savedBypassAddress.Address);
+        Assert.True(savedBypassAddress.IsEnabled);
     }
 
     [Fact]
@@ -62,6 +68,9 @@ public class GatewayDbContextTests
         Assert.Equal("rate_limits", dbContext.Model.FindEntityType(typeof(RateLimit))?.GetTableName());
         Assert.Equal("routes", dbContext.Model.FindEntityType(typeof(RouteDefinition))?.GetTableName());
         Assert.Equal("audit_entries", dbContext.Model.FindEntityType(typeof(AuditEntry))?.GetTableName());
+        Assert.Equal(
+            "api_key_bypass_addresses",
+            dbContext.Model.FindEntityType(typeof(ApiKeyBypassAddress))?.GetTableName());
     }
 
     private static DbContextOptions<GatewayDbContext> CreateOptions()

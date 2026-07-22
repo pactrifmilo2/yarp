@@ -219,11 +219,14 @@ public class ApiKeyAuthenticationMiddlewareTests
         bool enabled = false,
         params string[] allowedIpAddresses)
     {
-        return new IpAddressApiKeyBypassPolicy(Options.Create(new ApiKeyBypassOptions
-        {
-            Enabled = enabled,
-            AllowedIpAddresses = allowedIpAddresses,
-        }));
+        var databaseOptions = CreateOptions();
+        return new IpAddressApiKeyBypassPolicy(
+            Options.Create(new ApiKeyBypassOptions
+            {
+                Enabled = enabled,
+                AllowedIpAddresses = allowedIpAddresses,
+            }),
+            new TestGatewayDbContextFactory(databaseOptions));
     }
 
     private sealed class TestGatewayDbContextFactory(DbContextOptions<GatewayDbContext> options)
