@@ -1,6 +1,8 @@
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using MyProxy.Domain.Entities;
 using MyProxy.Infrastructure.Auth;
 using MyProxy.Infrastructure.Persistence;
@@ -33,7 +35,8 @@ public class ApiKeyAuthenticationMiddlewareTests
         await middleware.InvokeAsync(
             context,
             new DatabaseClientApiKeyResolver(new TestGatewayDbContextFactory(options), hasher),
-            clientContext);
+            clientContext,
+            CreateBypassPolicy());
 
         Assert.True(nextCalled);
         Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
@@ -49,7 +52,8 @@ public class ApiKeyAuthenticationMiddlewareTests
         await middleware.InvokeAsync(
             context,
             new DatabaseClientApiKeyResolver(new TestGatewayDbContextFactory(CreateOptions()), new Sha256ApiKeyHasher()),
-            new GatewayClientContext());
+            new GatewayClientContext(),
+            CreateBypassPolicy());
 
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
     }
@@ -67,7 +71,8 @@ public class ApiKeyAuthenticationMiddlewareTests
         await middleware.InvokeAsync(
             context,
             new DatabaseClientApiKeyResolver(new TestGatewayDbContextFactory(options), new Sha256ApiKeyHasher()),
-            new GatewayClientContext());
+            new GatewayClientContext(),
+            CreateBypassPolicy());
 
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
     }
@@ -86,7 +91,8 @@ public class ApiKeyAuthenticationMiddlewareTests
         await middleware.InvokeAsync(
             context,
             new DatabaseClientApiKeyResolver(new TestGatewayDbContextFactory(options), hasher),
-            new GatewayClientContext());
+            new GatewayClientContext(),
+            CreateBypassPolicy());
 
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
     }
@@ -104,9 +110,56 @@ public class ApiKeyAuthenticationMiddlewareTests
         await middleware.InvokeAsync(
             context,
             new DatabaseClientApiKeyResolver(new TestGatewayDbContextFactory(options), hasher),
-            new GatewayClientContext());
+            new GatewayClientContext(),
+            CreateBypassPolicy());
 
         Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Invoke_allows_configured_ip_without_api_key_or_scopes()
+    {
+        var context = CreateHttpContext(apiKey: null, requiredScopes: "admin:all");
+        context.Connection.RemoteIpAddress = IPAddress.Parse("172.29.187.90");
+        var clientContext = new GatewayClientContext();
+        var nextCalled = false;
+        var middleware = new ApiKeyAuthenticationMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            new DatabaseClientApiKeyResolver(
+                new TestGatewayDbContextFactory(CreateOptions()),
+                new Sha256ApiKeyHasher()),
+            clientContext,
+            CreateBypassPolicy(enabled: true, "172.29.187.90"));
+
+        Assert.True(nextCalled);
+        Assert.True(clientContext.UsedIpBypass);
+        Assert.Null(clientContext.Client);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Invoke_requires_api_key_when_remote_ip_is_not_configured()
+    {
+        var context = CreateHttpContext(apiKey: null, requiredScopes: null);
+        context.Connection.RemoteIpAddress = IPAddress.Parse("172.29.187.91");
+        var middleware = new ApiKeyAuthenticationMiddleware(
+            _ => throw new InvalidOperationException("Next should not run."));
+
+        await middleware.InvokeAsync(
+            context,
+            new DatabaseClientApiKeyResolver(
+                new TestGatewayDbContextFactory(CreateOptions()),
+                new Sha256ApiKeyHasher()),
+            new GatewayClientContext(),
+            CreateBypassPolicy(enabled: true, "172.29.187.90"));
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
     }
 
     private static DefaultHttpContext CreateHttpContext(string? apiKey, string? requiredScopes)
@@ -160,6 +213,17 @@ public class ApiKeyAuthenticationMiddlewareTests
         return new DbContextOptionsBuilder<GatewayDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
+    }
+
+    private static IApiKeyBypassPolicy CreateBypassPolicy(
+        bool enabled = false,
+        params string[] allowedIpAddresses)
+    {
+        return new IpAddressApiKeyBypassPolicy(Options.Create(new ApiKeyBypassOptions
+        {
+            Enabled = enabled,
+            AllowedIpAddresses = allowedIpAddresses,
+        }));
     }
 
     private sealed class TestGatewayDbContextFactory(DbContextOptions<GatewayDbContext> options)

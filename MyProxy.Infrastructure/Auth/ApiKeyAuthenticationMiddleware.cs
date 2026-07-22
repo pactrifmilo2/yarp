@@ -13,8 +13,16 @@ public sealed class ApiKeyAuthenticationMiddleware(RequestDelegate next)
     public async Task InvokeAsync(
         HttpContext httpContext,
         IClientApiKeyResolver clientResolver,
-        GatewayClientContext clientContext)
+        GatewayClientContext clientContext,
+        IApiKeyBypassPolicy bypassPolicy)
     {
+        if (bypassPolicy.IsAllowed(httpContext.Connection.RemoteIpAddress))
+        {
+            clientContext.UsedIpBypass = true;
+            await next(httpContext);
+            return;
+        }
+
         var apiKey = httpContext.Request.Headers[ApiKeyHeaderName].ToString();
 
         if (string.IsNullOrWhiteSpace(apiKey))

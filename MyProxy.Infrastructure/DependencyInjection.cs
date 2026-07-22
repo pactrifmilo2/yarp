@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,14 @@ public static class DependencyInjection
             provider.GetRequiredService<DatabaseProxyConfigProvider>());
         services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
         services.AddSingleton<IApiKeyGenerator, CryptographicApiKeyGenerator>();
+        services.AddOptions<ApiKeyBypassOptions>()
+            .Bind(configuration.GetSection(ApiKeyBypassOptions.SectionName))
+            .Validate(
+                options => options.AllowedIpAddresses.All(
+                    address => IPAddress.TryParse(address, out _)),
+                "Authentication:ApiKeyBypass:AllowedIpAddresses contains an invalid IP address.")
+            .ValidateOnStart();
+        services.AddSingleton<IApiKeyBypassPolicy, IpAddressApiKeyBypassPolicy>();
         services.AddSingleton<IGatewayMetrics, GatewayMetrics>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<MonitoringSummaryQuery>();

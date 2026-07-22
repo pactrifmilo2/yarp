@@ -22,7 +22,8 @@ public sealed class AuditLoggingMiddleware(
 
         stopwatch.Stop();
         var endpoint = GetEndpoint(httpContext.Request);
-        var clientName = clientContext.Client?.Name ?? "anonymous";
+        var clientName = clientContext.Client?.Name ??
+            (clientContext.UsedIpBypass ? "ip-bypass" : "anonymous");
 
         gatewayMetrics.RecordRequest(
             clientName,
