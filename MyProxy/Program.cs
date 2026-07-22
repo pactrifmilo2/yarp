@@ -10,14 +10,32 @@ using MyProxy.Infrastructure.Proxy;
 using MyProxy.Infrastructure.RateLimiting;
 using OpenTelemetry.Exporter;
 
+const string GatewayCorsPolicy = "GatewayCors";
+
 var builder = WebApplication.CreateBuilder(args);
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
 
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
 builder.Services.AddGatewayObservability();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(GatewayCorsPolicy, policy =>
+    {
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddReverseProxy();
 
 var app = builder.Build();
+
+app.UseCors(GatewayCorsPolicy);
 
 app.MapGet("/health", () => TypedResults.Ok(new
 {
