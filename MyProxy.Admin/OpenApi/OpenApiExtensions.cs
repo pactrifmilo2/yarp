@@ -12,9 +12,9 @@ public static class OpenApiExtensions
             {
                 document.Info = new()
                 {
-                    Title = "MyProxy Control Plane API",
+                    Title = "ATFM Gateway Admin API",
                     Version = "v1",
-                    Description = "Manage API clients, routes, scopes, rate limits, and audit logs for the YARP gateway.",
+                    Description = "Manage API clients, routes, scopes, rate limits, and audit logs for ATFM Gateway.",
                 };
                 return Task.CompletedTask;
             });
@@ -29,7 +29,7 @@ public static class OpenApiExtensions
 
         app.UseSwaggerUI(options =>
         {
-            options.SwaggerEndpoint("/openapi/v1.json", "MyProxy Control Plane API");
+            options.SwaggerEndpoint("/openapi/v1.json", "ATFM Gateway Admin API");
         });
 
         return app;

@@ -1,4 +1,4 @@
-# Deploy MyProxy with NSSM
+# Deploy ATFM Gateway with NSSM
 
 This deployment runs the Gateway and Admin applications on the same Windows PC:
 
@@ -90,4 +90,3 @@ Monitoring: http://SERVER_IP:5106/monitoring
 ```
 
 Allow inbound TCP `5176` for API clients. Restrict TCP `5106` to administrators because the Admin application does not yet have login authentication.
-

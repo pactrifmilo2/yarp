@@ -25,7 +25,7 @@ public class DocsPostmanCollectionTests
         using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var root = document.RootElement;
 
-        Assert.Equal("MyProxy YARP Gateway", root.GetProperty("info").GetProperty("name").GetString());
+        Assert.Equal("ATFM Gateway", root.GetProperty("info").GetProperty("name").GetString());
         Assert.True(root.GetProperty("item").GetArrayLength() > 0);
         Assert.Contains(
             root.GetProperty("variable").EnumerateArray(),

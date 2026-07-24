@@ -11,23 +11,63 @@
         <p>Theo dõi client, endpoint, mã phản hồi và độ trễ của các yêu cầu đi qua gateway.</p>
     </div>
     <div class="toolbar">
+        <label class="audit-search">
+            Lọc nhật ký
+            <InputText @bind-Value="_search"
+                       @bind-Value:event="oninput"
+                       placeholder="Client, IP, endpoint, tham số..." />
+        </label>
         <label>
             Số dòng
             <InputNumber @bind-Value="_take" />
         </label>
-        <button class="primary-button" type="button" @onclick="LoadAuditEntriesAsync">Tải lại</button>
+        <button class="primary-button" type="button" disabled="@_isLoading" @onclick="LoadAuditEntriesAsync">
+            @(_isLoading ? "Đang tải..." : "Tải lại")
+        </button>
     </div>
 </section>
 
-<section class="panel">
+<section class="panel audit-panel">
+    @{
+        var visibleEntries = FilterAuditEntries();
+    }
+
     @if (_auditEntries.Count == 0)
     {
-        <p>Chưa có nhật ký truy cập.</p>
+        <div class="empty-state">
+            <strong>Chưa có nhật ký truy cập</strong>
+            <p>Các yêu cầu đi qua gateway sẽ xuất hiện tại đây.</p>
+        </div>
+    }
+    else if (visibleEntries.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>Không tìm thấy kết quả</strong>
+            <p>Thử từ khóa khác hoặc xóa nội dung trong ô lọc.</p>
+        </div>
     }
     else
     {
-        <div class="table-wrap">
-            <table>
+        <div class="table-summary">
+            <span>Hiển thị <strong>@visibleEntries.Count</strong> / @_auditEntries.Count yêu cầu</span>
+            @if (_lastLoadedAt is not null)
+            {
+                <span>Cập nhật lúc @_lastLoadedAt.Value.ToString("HH:mm:ss")</span>
+            }
+        </div>
+
+        <div class="table-wrap audit-table-wrap">
+            <table class="audit-table">
+                <colgroup>
+                    <col class="audit-col-time" />
+                    <col class="audit-col-client" />
+                    <col class="audit-col-ip" />
+                    <col class="audit-col-method" />
+                    <col class="audit-col-endpoint" />
+                    <col class="audit-col-query" />
+                    <col class="audit-col-status" />
+                    <col class="audit-col-latency" />
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Thời gian</th>
@@ -35,24 +75,27 @@
                         <th>IP</th>
                         <th>Phương thức</th>
                         <th>Endpoint</th>
-                        <th>Tham số</th>
+                        <th>Tham số GET</th>
                         <th>Trạng thái</th>
                         <th>Độ trễ</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var entry in _auditEntries)
+                    @foreach (var entry in visibleEntries)
                     {
                         <tr>
-                            <td>@entry.Timestamp.ToLocalTime().ToString("HH:mm:ss dd/MM/yyyy")</td>
+                            <td class="audit-time">
+                                <strong>@entry.Timestamp.ToLocalTime().ToString("HH:mm:ss")</strong>
+                                <span>@entry.Timestamp.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                            </td>
                             <td>@(entry.Client?.Name ?? "Không xác định")</td>
-                            <td>@entry.IpAddress</td>
-                            <td>@entry.Method</td>
-                            <td>@entry.Path</td>
+                            <td class="audit-nowrap">@entry.IpAddress</td>
+                            <td><span class="method-badge">@entry.Method</span></td>
+                            <td><code class="endpoint-path" title="@entry.Path">@entry.Path</code></td>
                             <td>
-                                @if (entry.QueryString is null)
+                                @if (string.IsNullOrWhiteSpace(entry.QueryString))
                                 {
-                                    <span>-</span>
+                                    <span class="empty-value">Không có</span>
                                 }
                                 else
                                 {
@@ -64,7 +107,7 @@
                                     @entry.StatusCode
                                 </span>
                             </td>
-                            <td>@entry.Latency.TotalMilliseconds.ToString("0.##") ms</td>
+                            <td class="audit-nowrap">@entry.Latency.TotalMilliseconds.ToString("0.##") ms</td>
                         </tr>
                     }
                 </tbody>
@@ -75,6 +118,9 @@
 
 @code {
     private int _take = 100;
+    private string _search = string.Empty;
+    private bool _isLoading;
+    private DateTime? _lastLoadedAt;
     private List<AuditEntry> _auditEntries = [];
 
     protected override async Task OnInitializedAsync()
@@ -84,13 +130,47 @@
 
     private async Task LoadAuditEntriesAsync()
     {
-        var take = Math.Clamp(_take, 1, 500);
-        _take = take;
-        _auditEntries = await DbContext.AuditEntries
-            .AsNoTracking()
-            .Include(entry => entry.Client)
-            .OrderByDescending(entry => entry.Timestamp)
-            .Take(take)
-            .ToListAsync();
+        _isLoading = true;
+
+        try
+        {
+            var take = Math.Clamp(_take, 1, 500);
+            _take = take;
+            _auditEntries = await DbContext.AuditEntries
+                .AsNoTracking()
+                .Include(entry => entry.Client)
+                .OrderByDescending(entry => entry.Timestamp)
+                .Take(take)
+                .ToListAsync();
+            _lastLoadedAt = DateTime.Now;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private List<AuditEntry> FilterAuditEntries()
+    {
+        if (string.IsNullOrWhiteSpace(_search))
+        {
+            return _auditEntries;
+        }
+
+        var term = _search.Trim();
+        return _auditEntries
+            .Where(entry =>
+                Contains(entry.Client?.Name, term) ||
+                Contains(entry.IpAddress, term) ||
+                Contains(entry.Method, term) ||
+                Contains(entry.Path, term) ||
+                Contains(entry.QueryString, term) ||
+                entry.StatusCode.ToString().Contains(term, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private static bool Contains(string? value, string term)
+    {
+        return value?.Contains(term, StringComparison.OrdinalIgnoreCase) == true;
     }
 }

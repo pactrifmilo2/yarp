@@ -27,7 +27,7 @@ public class OpenApiTests
         using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         var root = document.RootElement;
 
-        Assert.Equal("MyProxy Control Plane API", root.GetProperty("info").GetProperty("title").GetString());
+        Assert.Equal("ATFM Gateway Admin API", root.GetProperty("info").GetProperty("title").GetString());
 
         var paths = root.GetProperty("paths");
         Assert.True(paths.TryGetProperty("/api/control/clients", out _));

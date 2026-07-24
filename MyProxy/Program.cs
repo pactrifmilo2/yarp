@@ -39,7 +39,7 @@ app.UseCors(GatewayCorsPolicy);
 
 app.MapGet("/health", () => TypedResults.Ok(new
 {
-    service = "MyProxy",
+    service = "ATFM Gateway",
     status = "healthy",
 }));
 

@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "MyProxy ATFM Gateway",
-    "description": "Control-plane API and gateway proxy requests for the MyProxy on-prem API gateway.\n\n## Setup\n1. Import this collection into Postman.\n2. Review collection variables (`adminBaseUrl`, `gatewayBaseUrl`, `apiKey`).\n3. Run **Control Plane → Clients → Create client** first if you need a fresh API key.\n4. Run **Control Plane → Routes → List routes** to confirm proxy routes exist.\n5. Use **Gateway → Proxy** requests to test traffic through YARP.\n\n## Ports (default)\n- Admin / control API: `http://localhost:5106`\n- Gateway proxy: `http://localhost:5176`\n\n## Auth\nGateway requests require header `X-API-Key`. Routes may also require scopes such as `read:flights`.",
+    "name": "ATFM Gateway",
+    "description": "Control-plane API and gateway proxy requests for the ATFM internal API gateway.\n\n## Setup\n1. Import this collection into Postman.\n2. Review collection variables (`adminBaseUrl`, `gatewayBaseUrl`, `apiKey`).\n3. Run **Control Plane → Clients → Create client** first if you need a fresh API key.\n4. Run **Control Plane → Routes → List routes** to confirm proxy routes exist.\n5. Use **Gateway → Proxy** requests to test traffic through ATFM Gateway.\n\n## Ports (default)\n- Admin / control API: `http://localhost:5106`\n- Gateway proxy: `http://localhost:5176`\n\n## Auth\nGateway requests require header `X-API-Key`. Routes may also require scopes such as `read:flights`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -34,7 +34,7 @@
   "item": [
     {
       "name": "Gateway (Proxy)",
-      "description": "Requests forwarded through the YARP gateway. Requires a valid API key and matching route/scopes.",
+      "description": "Requests forwarded through ATFM Gateway. Requires a valid API key and matching route/scopes.",
       "item": [
         {
           "name": "GET /get (httpbin via catch-all route)",
@@ -467,7 +467,7 @@
                 "routes"
               ]
             },
-            "description": "Use a unique `routeId` if this fails with duplicate key. Triggers YARP config reload."
+            "description": "Use a unique `routeId` if this fails with duplicate key. Triggers an ATFM Gateway configuration reload."
           },
           "response": []
         },

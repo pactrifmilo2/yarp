@@ -54,4 +54,4 @@ $env:PGPASSWORD = $NewPassword
 Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
 
 Write-Host "`nDone. Connection string password is now: $NewPassword" -ForegroundColor Green
-Write-Host "Matches MyProxy appsettings: Password=$NewPassword"
+Write-Host "Matches ATFM Gateway appsettings: Password=$NewPassword"

@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-rem Start MyProxy Admin UI + Gateway in separate terminals.
+rem Start ATFM Gateway Admin UI + Gateway in separate terminals.
 rem Requires PostgreSQL with migrations applied (see scripts/reset-postgres-password.ps1).
 
 cd /d "%~dp0"
@@ -32,11 +32,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Starting MyProxy Admin  (http://localhost:5106) ...
-start "MyProxy Admin" cmd /k dotnet run --no-build --project "%~dp0MyProxy.Admin\MyProxy.Admin.csproj" --launch-profile http
+echo Starting ATFM Gateway Admin (http://localhost:5106) ...
+start "ATFM Gateway Admin" cmd /k dotnet run --no-build --project "%~dp0MyProxy.Admin\MyProxy.Admin.csproj" --launch-profile http
 
-echo Starting MyProxy Gateway (http://localhost:5176) ...
-start "MyProxy Gateway" cmd /k dotnet run --no-build --project "%~dp0MyProxy\MyProxy.csproj" --launch-profile http
+echo Starting ATFM Gateway (http://localhost:5176) ...
+start "ATFM Gateway" cmd /k dotnet run --no-build --project "%~dp0MyProxy\MyProxy.csproj" --launch-profile http
 
 echo.
 echo Admin:   http://localhost:5106

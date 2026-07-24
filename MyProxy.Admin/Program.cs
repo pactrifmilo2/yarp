@@ -44,7 +44,7 @@ app.MapGatewayOpenApi();
 app.MapDocsEndpoints();
 app.MapGet("/health", () => TypedResults.Ok(new
 {
-    service = "MyProxy.Admin",
+    service = "ATFM Gateway Admin",
     status = "healthy",
 }));
 
